@@ -27,27 +27,32 @@ The project is now organized as a three-part monorepo: Rust core runtime, reusab
 
 ```bash
 bun install
-bun run core:serve
 bun run dev
 ```
 
 Run the desktop shell:
 
 ```bash
-bun run tauri dev
+bun run dev:desktop
 ```
 
-Build the web target:
+Build all cached targets:
 
 ```bash
 bun run build
 ```
 
-Run Rust validation:
+Build only the web target:
 
 ```bash
-cargo test --workspace
-cargo check --workspace
+bun run build:web
+```
+
+Run cached validation:
+
+```bash
+bun run check
+bun run test
 ```
 
 Run the mock acceptance scenario:

@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.orchidex.app",
   "build": {
-    "beforeDevCommand": "bun run --cwd ../web dev",
+    "beforeDevCommand": "bun run --cwd .. dev:web",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "bun run --cwd ../web build",
+    "beforeBuildCommand": "bun run --cwd .. build:web",
     "frontendDist": "../../web/dist"
   },
   "app": {

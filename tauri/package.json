@@ -4,6 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "check": "cargo check -p orchidex-tauri",
+    "test": "cargo test -p orchidex-tauri",
     "tauri": "tauri"
   },
   "devDependencies": {

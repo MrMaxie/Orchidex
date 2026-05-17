@@ -1,0 +1,31 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["@orchidex/core#build", "@orchidex/web#build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/core/Cargo.toml",
+        "$TURBO_ROOT$/core/src/**",
+        "$TURBO_ROOT$/core/tests/**"
+      ],
+      "outputs": ["src-tauri/target/release/bundle/**"]
+    },
+    "check": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/core/Cargo.toml",
+        "$TURBO_ROOT$/core/src/**",
+        "$TURBO_ROOT$/core/tests/**"
+      ]
+    },
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/core/Cargo.toml",
+        "$TURBO_ROOT$/core/src/**",
+        "$TURBO_ROOT$/core/tests/**"
+      ]
+    }
+  }
+}

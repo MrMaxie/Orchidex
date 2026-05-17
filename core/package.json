@@ -1,0 +1,12 @@
+{
+  "name": "@orchidex/core",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "cargo run -p orchidex-core -- serve",
+    "build": "cargo build -p orchidex-core",
+    "check": "cargo check -p orchidex-core",
+    "test": "cargo test -p orchidex-core",
+    "cli": "cargo run -p orchidex-core --"
+  }
+}

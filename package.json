@@ -3,16 +3,28 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "packageManager": "bun@1.3.8",
   "workspaces": [
+    "core",
     "web",
     "tauri"
   ],
   "scripts": {
-    "dev": "bun run --cwd web dev",
-    "build": "bun run --cwd web build",
-    "preview": "bun run --cwd web preview",
+    "dev": "turbo run dev --filter=@orchidex/core --filter=@orchidex/web",
+    "dev:web": "turbo run dev --filter=@orchidex/web",
+    "dev:core": "turbo run dev --filter=@orchidex/core",
+    "dev:desktop": "turbo run dev --filter=@orchidex/tauri",
+    "build": "turbo run build",
+    "build:web": "turbo run build --filter=@orchidex/web",
+    "build:desktop": "turbo run build --filter=@orchidex/tauri",
+    "check": "turbo run check",
+    "test": "turbo run test --filter=@orchidex/core --filter=@orchidex/tauri",
+    "preview": "turbo run preview --filter=@orchidex/web",
     "core": "cargo run -p orchidex-core --",
-    "core:serve": "cargo run -p orchidex-core -- serve",
+    "core:serve": "turbo run dev --filter=@orchidex/core",
     "tauri": "bun run --cwd tauri tauri"
+  },
+  "devDependencies": {
+    "turbo": "2.9.14"
   }
 }
