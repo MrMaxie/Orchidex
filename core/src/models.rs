@@ -169,6 +169,14 @@ pub struct IgniteSparkRequest {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ResolveManualGateRequest {
+    pub spark_id: String,
+    #[serde(default)]
+    pub payload: Option<Payload>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CommandResult<T> {
     pub ok: bool,
     pub value: Option<T>,
@@ -216,10 +224,38 @@ pub enum RuntimeEvent {
         spark_id: String,
         reason: String,
     },
+    SparkWaiting {
+        spark_id: String,
+        node_id: String,
+        reason: String,
+        resolution: String,
+    },
+    SparkFailed {
+        spark_id: String,
+        node_id: String,
+        reason: String,
+    },
+    SparkCompleted {
+        spark_id: String,
+        node_id: String,
+        reason: String,
+    },
     SparkExtinguished {
         spark_id: String,
     },
     AllSparksExtinguished,
+    QueueChanged {
+        node_id: String,
+        released: bool,
+    },
+    ManualGateChanged {
+        spark_id: String,
+        node_id: String,
+        resolved: bool,
+    },
+    DiagnosticRecorded {
+        diagnostic: RuntimeDiagnostic,
+    },
     Log {
         node_id: String,
         message: String,

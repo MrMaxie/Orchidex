@@ -100,8 +100,14 @@ async fn events(
             RuntimeEvent::SparkMoved { .. } => "spark-moved",
             RuntimeEvent::NodeStatusChanged { .. } => "node-status-changed",
             RuntimeEvent::SparkBlocked { .. } => "spark-blocked",
+            RuntimeEvent::SparkWaiting { .. } => "spark-waiting",
+            RuntimeEvent::SparkFailed { .. } => "spark-failed",
+            RuntimeEvent::SparkCompleted { .. } => "spark-completed",
             RuntimeEvent::SparkExtinguished { .. } => "spark-extinguished",
             RuntimeEvent::AllSparksExtinguished => "all-sparks-extinguished",
+            RuntimeEvent::QueueChanged { .. } => "queue-changed",
+            RuntimeEvent::ManualGateChanged { .. } => "manual-gate-changed",
+            RuntimeEvent::DiagnosticRecorded { .. } => "diagnostic-recorded",
             RuntimeEvent::Log { .. } => "log",
         };
         Some(Ok(Event::default().event(name).data(data)))

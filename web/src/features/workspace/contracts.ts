@@ -119,8 +119,14 @@ export type RuntimeEvent =
     }
   | { type: "nodeStatusChanged"; nodeId: string; status: CoreNodeStatus }
   | { type: "sparkBlocked"; sparkId: string; reason: string }
+  | { type: "sparkWaiting"; sparkId: string; nodeId: string; reason: string; resolution: string }
+  | { type: "sparkFailed"; sparkId: string; nodeId: string; reason: string }
+  | { type: "sparkCompleted"; sparkId: string; nodeId: string; reason: string }
   | { type: "sparkExtinguished"; sparkId: string }
   | { type: "allSparksExtinguished" }
+  | { type: "queueChanged"; nodeId: string; released: boolean }
+  | { type: "manualGateChanged"; sparkId: string; nodeId: string; resolved: boolean }
+  | { type: "diagnosticRecorded"; diagnostic: RuntimeDiagnostic }
   | { type: "log"; nodeId: string; message: string };
 
 export type RunHistoryEntry = {

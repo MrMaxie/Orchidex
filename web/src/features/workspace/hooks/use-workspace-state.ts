@@ -415,6 +415,24 @@ function applyRuntimeEvent(project: Project, event: RuntimeEvent): Project {
         sparks: setSparkStatus(project.sparks, event.sparkId, "blocked"),
         eventLog,
       });
+    case "sparkWaiting":
+      return withDerivedActivity({
+        ...project,
+        sparks: setSparkStatus(project.sparks, event.sparkId, "blocked"),
+        eventLog,
+      });
+    case "sparkFailed":
+      return withDerivedActivity({
+        ...project,
+        sparks: setSparkStatus(project.sparks, event.sparkId, "blocked"),
+        eventLog,
+      });
+    case "sparkCompleted":
+      return withDerivedActivity({
+        ...project,
+        sparks: setSparkStatus(project.sparks, event.sparkId, "completed"),
+        eventLog,
+      });
     case "sparkExtinguished":
       return withDerivedActivity({
         ...project,
@@ -432,6 +450,12 @@ function applyRuntimeEvent(project: Project, event: RuntimeEvent): Project {
         ),
         eventLog,
       });
+    case "queueChanged":
+      return { ...project, eventLog };
+    case "manualGateChanged":
+      return { ...project, eventLog };
+    case "diagnosticRecorded":
+      return { ...project, eventLog };
     case "log":
       return { ...project, eventLog };
   }

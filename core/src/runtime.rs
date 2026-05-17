@@ -302,6 +302,16 @@ impl RuntimeHandle {
                     spark_id: spark_id.to_owned(),
                     reason: "current node is missing".to_owned(),
                 });
+                events.push(RuntimeEvent::DiagnosticRecorded {
+                    diagnostic: RuntimeDiagnostic {
+                        kind: "missing-node".to_owned(),
+                        message: "current node is missing".to_owned(),
+                        graph_id: state.graph.id.clone(),
+                        spark_id: Some(spark_id.to_owned()),
+                        node_id: Some(current.current_node_id.clone()),
+                        context: Default::default(),
+                    },
+                });
                 self.persist_state(&state)?;
                 return Ok(AdvanceOutcome::Finished);
             };
@@ -369,6 +379,16 @@ impl RuntimeHandle {
                     node_id: Some(current.current_node_id.clone()),
                     context: Default::default(),
                 });
+                events.push(RuntimeEvent::DiagnosticRecorded {
+                    diagnostic: RuntimeDiagnostic {
+                        kind: "node-diagnostic".to_owned(),
+                        message: message.clone(),
+                        graph_id: graph_id.clone(),
+                        spark_id: Some(spark_id.to_owned()),
+                        node_id: Some(current.current_node_id.clone()),
+                        context: Default::default(),
+                    },
+                });
             }
             let Some(mut spark) = state.sparks.remove(spark_id) else {
                 return Ok(AdvanceOutcome::Finished);
@@ -411,6 +431,11 @@ impl RuntimeHandle {
                             });
                             events.push(RuntimeEvent::SparkBlocked {
                                 spark_id: spark_id.to_owned(),
+                                reason: format!("edge '{}' points to a missing node", edge.id),
+                            });
+                            events.push(RuntimeEvent::SparkFailed {
+                                spark_id: spark_id.to_owned(),
+                                node_id: current.current_node_id.clone(),
                                 reason: format!("edge '{}' points to a missing node", edge.id),
                             });
                             state
@@ -536,6 +561,31 @@ impl RuntimeHandle {
                         spark_id: spark_id.to_owned(),
                         reason: wait_reason.clone(),
                     });
+                    events.push(RuntimeEvent::SparkWaiting {
+                        spark_id: spark_id.to_owned(),
+                        node_id: current.current_node_id.clone(),
+                        reason: wait_reason.clone(),
+                        resolution: if node.kind == "std/manual-accept" {
+                            "manual-resolution".to_owned()
+                        } else if node.kind == "std/accumulation" {
+                            "queue-release".to_owned()
+                        } else {
+                            "timer".to_owned()
+                        },
+                    });
+                    if node.kind == "std/manual-accept" {
+                        events.push(RuntimeEvent::ManualGateChanged {
+                            spark_id: spark_id.to_owned(),
+                            node_id: current.current_node_id.clone(),
+                            resolved: false,
+                        });
+                    }
+                    if node.kind == "std/accumulation" {
+                        events.push(RuntimeEvent::QueueChanged {
+                            node_id: current.current_node_id.clone(),
+                            released: false,
+                        });
+                    }
                     state
                         .traces
                         .entry(spark_id.to_owned())
@@ -571,6 +621,11 @@ impl RuntimeHandle {
                     });
                     events.push(RuntimeEvent::SparkBlocked {
                         spark_id: spark_id.to_owned(),
+                        reason: block_reason.clone(),
+                    });
+                    events.push(RuntimeEvent::SparkFailed {
+                        spark_id: spark_id.to_owned(),
+                        node_id: current.current_node_id.clone(),
                         reason: block_reason.clone(),
                     });
                     state
@@ -610,6 +665,11 @@ impl RuntimeHandle {
                         spark_id: spark_id.to_owned(),
                         reason: failure_reason.clone(),
                     });
+                    events.push(RuntimeEvent::SparkFailed {
+                        spark_id: spark_id.to_owned(),
+                        node_id: current.current_node_id.clone(),
+                        reason: failure_reason.clone(),
+                    });
                     state
                         .traces
                         .entry(spark_id.to_owned())
@@ -637,6 +697,11 @@ impl RuntimeHandle {
                     events.push(RuntimeEvent::NodeStatusChanged {
                         node_id: current.current_node_id.clone(),
                         status: NodeStatus::Done,
+                    });
+                    events.push(RuntimeEvent::SparkCompleted {
+                        spark_id: spark_id.to_owned(),
+                        node_id: current.current_node_id.clone(),
+                        reason: "node requested completion".to_owned(),
                     });
                     state
                         .traces

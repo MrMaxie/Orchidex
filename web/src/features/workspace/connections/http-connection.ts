@@ -52,8 +52,14 @@ export function createHttpConnectionStrategy(
         "spark-moved",
         "node-status-changed",
         "spark-blocked",
+        "spark-waiting",
+        "spark-failed",
+        "spark-completed",
         "spark-extinguished",
         "all-sparks-extinguished",
+        "queue-changed",
+        "manual-gate-changed",
+        "diagnostic-recorded",
         "log",
       ];
       for (const eventName of eventNames) {
