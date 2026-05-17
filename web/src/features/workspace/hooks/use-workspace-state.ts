@@ -166,7 +166,11 @@ export function useWorkspaceState(connection: ConnectionStrategy | null) {
             {
               ...connectionParams,
               animated: true,
-              label: "spark",
+              sourceHandle: connectionParams.sourceHandle ?? "out",
+              targetHandle: connectionParams.targetHandle ?? "in",
+              data: {
+                routingLabel: null,
+              },
               style: { stroke: "var(--workflow-edge)", strokeWidth: 2 },
             },
             project.edges,

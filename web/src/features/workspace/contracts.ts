@@ -24,7 +24,9 @@ export type CoreGraphNode = {
 export type CoreGraphEdge = {
   id: string;
   source: string;
+  sourcePort: string;
   target: string;
+  targetPort: string;
   label?: string | null;
 };
 

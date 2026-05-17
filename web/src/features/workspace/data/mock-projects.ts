@@ -73,10 +73,10 @@ const clientsProjectGraph: CoreGraph = {
     },
   ],
   edges: [
-    { id: "manual-to-queue", source: "manual-start", target: "mail-accumulation", label: "release" },
-    { id: "queue-to-extract", source: "mail-accumulation", target: "extract-work", label: "one by one" },
-    { id: "extract-to-branch", source: "extract-work", target: "codex-branch", label: "task payload" },
-    { id: "branch-to-plan", source: "codex-branch", target: "codex-plan", label: "ready branch" },
+    { id: "manual-to-queue", source: "manual-start", sourcePort: "out", target: "mail-accumulation", targetPort: "in", label: "release" },
+    { id: "queue-to-extract", source: "mail-accumulation", sourcePort: "out", target: "extract-work", targetPort: "in", label: "one by one" },
+    { id: "extract-to-branch", source: "extract-work", sourcePort: "out", target: "codex-branch", targetPort: "in", label: "task payload" },
+    { id: "branch-to-plan", source: "codex-branch", sourcePort: "out", target: "codex-plan", targetPort: "in", label: "ready branch" },
   ],
 };
 
@@ -115,8 +115,15 @@ export function workflowToCoreGraph(project: Project): CoreGraph {
     edges: project.edges.map((edge) => ({
       id: edge.id,
       source: edge.source,
+      sourcePort: edge.sourceHandle ?? "out",
       target: edge.target,
-      label: typeof edge.label === "string" ? edge.label : null,
+      targetPort: edge.targetHandle ?? "in",
+      label:
+        typeof edge.data?.routingLabel === "string"
+          ? edge.data.routingLabel
+          : typeof edge.label === "string"
+            ? edge.label
+            : null,
     })),
   };
 }
@@ -141,9 +148,13 @@ function toWorkflowEdge(edge: CoreGraph["edges"][number]): WorkflowEdge {
   return {
     id: edge.id,
     source: edge.source,
+    sourceHandle: edge.sourcePort || "out",
     target: edge.target,
+    targetHandle: edge.targetPort || "in",
     animated: true,
-    label: edge.label ?? "spark",
+    data: {
+      routingLabel: edge.label ?? null,
+    },
     style: { stroke: "var(--workflow-edge)", strokeWidth: 2 },
   };
 }

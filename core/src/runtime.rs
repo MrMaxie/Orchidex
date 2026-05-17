@@ -308,7 +308,9 @@ mod tests {
             edges: vec![GraphEdge {
                 id: "loop".to_owned(),
                 source: "a".to_owned(),
+                source_port: "out".to_owned(),
                 target: "a".to_owned(),
+                target_port: "in".to_owned(),
                 label: None,
             }],
         });

@@ -52,9 +52,9 @@
     }
   ],
   "edges": [
-    { "id": "manual-to-queue", "source": "manual-start", "target": "mail-accumulation", "label": "release" },
-    { "id": "queue-to-extract", "source": "mail-accumulation", "target": "extract-work", "label": "one by one" },
-    { "id": "extract-to-branch", "source": "extract-work", "target": "codex-branch", "label": "task payload" },
-    { "id": "branch-to-plan", "source": "codex-branch", "target": "codex-plan", "label": "ready branch" }
+    { "id": "manual-to-queue", "source": "manual-start", "sourcePort": "out", "target": "mail-accumulation", "targetPort": "in", "label": "release" },
+    { "id": "queue-to-extract", "source": "mail-accumulation", "sourcePort": "out", "target": "extract-work", "targetPort": "in", "label": "one by one" },
+    { "id": "extract-to-branch", "source": "extract-work", "sourcePort": "out", "target": "codex-branch", "targetPort": "in", "label": "task payload" },
+    { "id": "branch-to-plan", "source": "codex-branch", "sourcePort": "out", "target": "codex-plan", "targetPort": "in", "label": "ready branch" }
   ]
 }

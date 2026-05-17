@@ -22,7 +22,10 @@ export type WorkflowNodeData = Record<string, unknown> & {
 };
 
 export type WorkflowNode = Node<WorkflowNodeData, "workflowNode">;
-export type WorkflowEdge = Edge;
+export type WorkflowEdgeData = Record<string, unknown> & {
+  routingLabel?: string | null;
+};
+export type WorkflowEdge = Edge<WorkflowEdgeData>;
 
 export type Project = {
   id: string;

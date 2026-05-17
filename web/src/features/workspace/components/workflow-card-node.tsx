@@ -21,6 +21,7 @@ export function WorkflowCardNode({ data, selected }: NodeProps<WorkflowNode>) {
     >
       <Handle
         className="!size-3 !border-2 !border-background !bg-primary"
+        id="in"
         position={Position.Left}
         type="target"
       />
@@ -61,6 +62,7 @@ export function WorkflowCardNode({ data, selected }: NodeProps<WorkflowNode>) {
       </div>
       <Handle
         className="!size-3 !border-2 !border-background !bg-primary"
+        id="out"
         position={Position.Right}
         type="source"
       />

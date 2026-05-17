@@ -36,9 +36,21 @@ pub struct GraphPosition {
 pub struct GraphEdge {
     pub id: String,
     pub source: String,
+    #[serde(default = "default_source_port")]
+    pub source_port: String,
     pub target: String,
+    #[serde(default = "default_target_port")]
+    pub target_port: String,
     #[serde(default)]
     pub label: Option<String>,
+}
+
+pub fn default_source_port() -> String {
+    "out".to_owned()
+}
+
+pub fn default_target_port() -> String {
+    "in".to_owned()
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
@@ -223,27 +235,72 @@ pub fn default_graph() -> Graph {
             GraphEdge {
                 id: "manual-to-queue".to_owned(),
                 source: "manual-start".to_owned(),
+                source_port: default_source_port(),
                 target: "mail-accumulation".to_owned(),
+                target_port: default_target_port(),
                 label: Some("release".to_owned()),
             },
             GraphEdge {
                 id: "queue-to-extract".to_owned(),
                 source: "mail-accumulation".to_owned(),
+                source_port: default_source_port(),
                 target: "extract-work".to_owned(),
+                target_port: default_target_port(),
                 label: Some("one by one".to_owned()),
             },
             GraphEdge {
                 id: "extract-to-branch".to_owned(),
                 source: "extract-work".to_owned(),
+                source_port: default_source_port(),
                 target: "codex-branch".to_owned(),
+                target_port: default_target_port(),
                 label: Some("task payload".to_owned()),
             },
             GraphEdge {
                 id: "branch-to-plan".to_owned(),
                 source: "codex-branch".to_owned(),
+                source_port: default_source_port(),
                 target: "codex-plan".to_owned(),
+                target_port: default_target_port(),
                 label: Some("ready branch".to_owned()),
             },
         ],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_edge_deserialization_uses_default_ports() {
+        let edge: GraphEdge = serde_json::from_value(serde_json::json!({
+            "id": "legacy-edge",
+            "source": "a",
+            "target": "b",
+            "label": "legacy route"
+        }))
+        .expect("legacy graph edge should deserialize");
+
+        assert_eq!(edge.source_port, "out");
+        assert_eq!(edge.target_port, "in");
+    }
+
+    #[test]
+    fn graph_edge_serializes_port_endpoints() {
+        let edge = GraphEdge {
+            id: "ported-edge".to_owned(),
+            source: "a".to_owned(),
+            source_port: "approved".to_owned(),
+            target: "b".to_owned(),
+            target_port: "intake".to_owned(),
+            label: Some("route metadata".to_owned()),
+        };
+
+        let value = serde_json::to_value(edge).expect("edge should serialize");
+
+        assert_eq!(value["sourcePort"], "approved");
+        assert_eq!(value["targetPort"], "intake");
+        assert_eq!(value["label"], "route metadata");
     }
 }
