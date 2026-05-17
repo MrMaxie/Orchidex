@@ -24,13 +24,29 @@ payload
 ## Fixture-First Codex
 
 ```rhai
-let cached = cache_get("codex/select-branch");
-if cached != () {
-  cached
-} else {
-  let response = freeze("codex/select-branch", payload);
-  response
+let fixture = codex_fixture("examples/fixtures/clients-project/codex-select-branch.json");
+#{
+  payload: #{
+    input: payload,
+    response: fixture["response"],
+    fixture: "examples/fixtures/clients-project/codex-select-branch.json"
+  },
+  diagnostics: ["fixture-first codex execution"]
 }
 ```
 
 Do not call live Codex from tests unless the user explicitly enables recording for the fixture being updated.
+
+## Explicit Wait Outcome
+
+```rhai
+#{
+  status: "wait",
+  payload: payload,
+  wait: #{
+    delayMs: 1000,
+    reason: "cooldown"
+  },
+  diagnostics: ["sleep node delayed spark"]
+}
+```

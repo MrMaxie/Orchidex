@@ -1,2 +1,2 @@
-log("debug/log received payload")
+log("debug/log received payload");
 payload

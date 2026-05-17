@@ -1032,4 +1032,60 @@ mod tests {
         assert_eq!(result.status, NodeExecutionStatus::Continue);
         assert_eq!(result.payload["response"]["branch"], "feat/clients-project-mail-review");
     }
+
+    #[test]
+    fn debug_log_node_emits_runtime_logs() {
+        let result = execute_rhai_file_with_context(
+            &node_entrypoint("nodes/debug/log/main.rhai"),
+            serde_json::json!({ "message": "hello" }),
+            serde_json::json!({ "target": "console" }),
+            &NodeExecutionHost::default(),
+        )
+        .expect("debug log node should execute");
+
+        assert_eq!(result.status, NodeExecutionStatus::Continue);
+        assert!(result
+            .logs
+            .iter()
+            .any(|message| message.contains("debug/log received payload")));
+    }
+
+    #[test]
+    fn placeholder_echo_node_passes_payload_through() {
+        let result = execute_rhai_file_with_context(
+            &node_entrypoint("nodes/debug/placeholder-echo/main.rhai"),
+            serde_json::json!({ "echo": true }),
+            serde_json::json!({}),
+            &NodeExecutionHost::default(),
+        )
+        .expect("placeholder echo node should execute");
+
+        assert_eq!(result.payload, serde_json::json!({ "echo": true }));
+    }
+
+    #[test]
+    fn placeholder_rhai_node_marks_payload() {
+        let result = execute_rhai_file_with_context(
+            &node_entrypoint("nodes/debug/placeholder-rhai/main.rhai"),
+            serde_json::json!({ "echo": true }),
+            serde_json::json!({ "note": "draft" }),
+            &NodeExecutionHost::default(),
+        )
+        .expect("placeholder rhai node should execute");
+
+        assert_eq!(result.payload["placeholder"], true);
+    }
+
+    #[test]
+    fn note_node_returns_no_output() {
+        let result = execute_rhai_file_with_context(
+            &node_entrypoint("nodes/debug/note/main.rhai"),
+            serde_json::json!({ "echo": true }),
+            serde_json::json!({ "note": "draft" }),
+            &NodeExecutionHost::default(),
+        )
+        .expect("note node should execute");
+
+        assert_eq!(result.payload, Value::Null);
+    }
 }
