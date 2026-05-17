@@ -10,6 +10,8 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@fontsource-variable/dosis": "5.2.8",
+    "@fontsource-variable/fira-code": "5.2.7",
     "@tauri-apps/api": "2.11.0",
     "@tauri-apps/plugin-opener": "2.5.4",
     "@xyflow/react": "12.10.2",

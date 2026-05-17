@@ -1,9 +1,13 @@
+@import "@fontsource-variable/dosis";
+@import "@fontsource-variable/fira-code";
 @import "tailwindcss";
 @import "@xyflow/react/dist/style.css";
 
 :root {
-  font-family: "Aptos Display", "Segoe UI Variable Display", "Trebuchet MS",
-    sans-serif;
+  --font-gui: "Dosis Variable", "Segoe UI Variable", "Segoe UI", sans-serif;
+  --font-code: "Fira Code Variable", "Cascadia Code", "Consolas", monospace;
+
+  font-family: var(--font-gui);
   color: #e2e8f0;
   background: #020617;
   font-synthesis: none;
@@ -24,6 +28,13 @@ body,
 body {
   min-width: 320px;
   min-height: 100vh;
+}
+
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--font-code);
 }
 
 .react-flow__node {
