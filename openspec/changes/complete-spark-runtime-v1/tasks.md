@@ -3,7 +3,7 @@
 - [x] 1.1 Define the v1 spark state machine and node execution outcome model in Rust.
 - [x] 1.1.a Ensure runtime contracts expose spark-derived activity summaries without workflow-level start, stop, or running state.
 - [ ] 1.2 Add local file-backed storage for graphs, active sparks, run history, queues, diagnostics, and replay metadata.
-- [ ] 1.3 Extend runtime commands and events for waiting, blocking, failure, completion, queue release, manual resolution, and run history inspection.
+- [x] 1.3 Extend runtime commands and events for waiting, blocking, failure, completion, queue release, manual resolution, and run history inspection.
 
 ## 2. Execution Engine
 

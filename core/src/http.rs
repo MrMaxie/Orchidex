@@ -1,9 +1,9 @@
 use crate::models::{
-    Graph, IgniteSparkRequest, NodeCatalogResponse, RunHistoryEntry, RuntimeDiagnostic,
-    RuntimeEvent, SparkTraceStep,
+    Graph, IgniteSparkRequest, NodeCatalogResponse, ResolveManualGateRequest, RunHistoryEntry,
+    RuntimeDiagnostic, RuntimeEvent, SparkTraceStep,
 };
 use crate::runtime::RuntimeHandle;
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::routing::{get, post};
@@ -21,6 +21,8 @@ pub fn router(runtime: RuntimeHandle) -> Router {
         .route("/nodes", get(get_node_catalog))
         .route("/sparks", post(ignite_spark))
         .route("/sparks/extinguish", post(extinguish_sparks))
+        .route("/runtime/queues/:node_id/release", post(release_queue))
+        .route("/runtime/manual/resolve", post(resolve_manual_gate))
         .route("/runtime/history", get(get_run_history))
         .route("/runtime/diagnostics", get(get_diagnostics))
         .route("/runtime/traces", get(get_traces))
@@ -65,6 +67,20 @@ async fn ignite_spark(
 
 async fn extinguish_sparks(State(runtime): State<RuntimeHandle>) -> Result<Json<usize>, ApiError> {
     Ok(Json(runtime.extinguish_all()?))
+}
+
+async fn release_queue(
+    State(runtime): State<RuntimeHandle>,
+    Path(node_id): Path<String>,
+) -> Result<Json<usize>, ApiError> {
+    Ok(Json(runtime.release_queue(&node_id)?))
+}
+
+async fn resolve_manual_gate(
+    State(runtime): State<RuntimeHandle>,
+    Json(request): Json<ResolveManualGateRequest>,
+) -> Result<Json<crate::models::Spark>, ApiError> {
+    Ok(Json(runtime.resolve_manual_gate(request)?))
 }
 
 async fn get_run_history(

@@ -3,6 +3,7 @@ import type {
   CoreGraph,
   CoreNodeCatalogResponse,
   IgniteSparkInput,
+  ResolveManualGateInput,
   RuntimeEvent,
   Spark,
 } from "@/features/workspace/contracts";
@@ -41,6 +42,16 @@ export function createHttpConnectionStrategy(
       }),
     extinguishSparks: () =>
       request<number>("/sparks/extinguish", { method: "POST" }),
+    releaseQueue: (nodeId: string) =>
+      request<number>(`/runtime/queues/${nodeId}/release`, { method: "POST" }),
+    resolveManualGate: (input: ResolveManualGateInput) =>
+      request<Spark>("/runtime/manual/resolve", {
+        method: "POST",
+        body: JSON.stringify({
+          sparkId: input.sparkId,
+          payload: input.payload,
+        }),
+      }),
     subscribe: (handler) => {
       const source = new EventSource(`${baseUrl}/events`);
       source.onmessage = (event) => {

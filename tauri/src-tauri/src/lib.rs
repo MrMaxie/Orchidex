@@ -1,6 +1,6 @@
 use orchidex_core::{
-    Graph, IgniteSparkRequest, NodeCatalogResponse, RunHistoryEntry, RuntimeDiagnostic,
-    RuntimeHandle, Spark, SparkTraceStep,
+    Graph, IgniteSparkRequest, NodeCatalogResponse, ResolveManualGateRequest, RunHistoryEntry,
+    RuntimeDiagnostic, RuntimeHandle, Spark, SparkTraceStep,
 };
 use tauri::{Emitter, State};
 
@@ -32,6 +32,19 @@ fn ignite_spark(
 #[tauri::command]
 fn extinguish_sparks(runtime: State<'_, RuntimeHandle>) -> Result<usize, String> {
     runtime.extinguish_all().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn release_queue(runtime: State<'_, RuntimeHandle>, node_id: String) -> Result<usize, String> {
+    runtime.release_queue(&node_id).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn resolve_manual_gate(
+    runtime: State<'_, RuntimeHandle>,
+    request: ResolveManualGateRequest,
+) -> Result<Spark, String> {
+    runtime.resolve_manual_gate(request).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -73,6 +86,8 @@ pub fn run() {
             replace_graph,
             ignite_spark,
             extinguish_sparks,
+            release_queue,
+            resolve_manual_gate,
             get_run_history,
             get_runtime_diagnostics,
             get_runtime_traces

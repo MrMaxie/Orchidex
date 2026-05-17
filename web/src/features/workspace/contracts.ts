@@ -168,11 +168,18 @@ export type IgniteSparkInput = {
   payload?: JsonValue;
 };
 
+export type ResolveManualGateInput = {
+  sparkId: string;
+  payload?: JsonValue;
+};
+
 export type ConnectionStrategy = {
   getGraph: () => Promise<CoreGraph>;
   getNodeCatalog: () => Promise<CoreNodeCatalogResponse>;
   replaceGraph: (graph: CoreGraph) => Promise<CoreGraph>;
   igniteSpark: (input: IgniteSparkInput) => Promise<Spark>;
   extinguishSparks: () => Promise<number>;
+  releaseQueue: (nodeId: string) => Promise<number>;
+  resolveManualGate: (input: ResolveManualGateInput) => Promise<Spark>;
   subscribe: (handler: (event: RuntimeEvent) => void) => () => void;
 };

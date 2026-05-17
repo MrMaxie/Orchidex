@@ -1,4 +1,4 @@
-if config["locked"] == true {
+if config["locked"] == true && payload["queueReleased"] != true {
   #{
     status: "wait",
     payload: payload,

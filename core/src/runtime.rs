@@ -1,7 +1,7 @@
 use crate::models::{
     default_graph, default_source_port, Graph, IgniteSparkRequest, NodeCatalogResponse, NodeStatus,
-    RunHistoryEntry, RuntimeDiagnostic, RuntimeEvent, RuntimeSnapshot, Spark, SparkStatus,
-    SparkTraceStep,
+    ResolveManualGateRequest, RunHistoryEntry, RuntimeDiagnostic, RuntimeEvent, RuntimeSnapshot,
+    Spark, SparkStatus, SparkTraceStep,
 };
 use crate::nodes::{
     discover_node_catalog, execute_rhai_file_with_context, NodeExecutionHost, NodeExecutionStatus,
@@ -205,6 +205,105 @@ impl RuntimeHandle {
         events.push(RuntimeEvent::AllSparksExtinguished);
         self.emit_many(events);
         Ok(extinguished)
+    }
+
+    pub fn release_queue(&self, node_id: &str) -> Result<usize, RuntimeError> {
+        let (released_ids, epoch, node_id) = {
+            let mut state = self.state.lock().map_err(|_| RuntimeError::LockPoisoned)?;
+            let Some(node) = state.graph.nodes.iter_mut().find(|node| node.id == node_id) else {
+                return Err(RuntimeError::MissingNode(node_id.to_owned()));
+            };
+            node.config["locked"] = serde_json::json!(false);
+
+            let mut released_ids = Vec::new();
+            for spark in state.sparks.values_mut() {
+                if spark.current_node_id == node_id && spark.status == SparkStatus::Blocked {
+                    spark.status = SparkStatus::Active;
+                    spark.payload["queueReleased"] = serde_json::json!(true);
+                    released_ids.push(spark.id.clone());
+                }
+            }
+            let epoch = state.epoch;
+            self.persist_state(&state)?;
+            (released_ids, epoch, node_id.to_owned())
+        };
+
+        self.emit(RuntimeEvent::QueueChanged {
+            node_id: node_id.clone(),
+            released: true,
+        });
+        self.emit(RuntimeEvent::NodeStatusChanged {
+            node_id: node_id.clone(),
+            status: NodeStatus::Running,
+        });
+
+        for spark_id in &released_ids {
+            let runtime = self.clone();
+            let spark_id = spark_id.clone();
+            tokio::spawn(async move {
+                runtime.drive_spark(spark_id, epoch).await;
+            });
+        }
+
+        Ok(released_ids.len())
+    }
+
+    pub fn resolve_manual_gate(&self, request: ResolveManualGateRequest) -> Result<Spark, RuntimeError> {
+        let (spark, epoch) = {
+            let mut state = self.state.lock().map_err(|_| RuntimeError::LockPoisoned)?;
+            let graph_id = state.graph.id.clone();
+            let Some(mut spark) = state.sparks.remove(&request.spark_id) else {
+                return Err(RuntimeError::MissingNode(request.spark_id));
+            };
+
+            let mut payload = request.payload.unwrap_or_else(|| spark.payload.clone());
+            payload["manualAccepted"] = serde_json::json!(true);
+            spark.payload = payload;
+            spark.status = SparkStatus::Active;
+
+            let node_id = spark.current_node_id.clone();
+            state.run_history.push(RunHistoryEntry {
+                spark_id: spark.id.clone(),
+                graph_id,
+                final_status: SparkStatus::Active,
+                last_node_id: node_id.clone(),
+                reason: Some("manual gate resolved".to_owned()),
+            });
+            state
+                .traces
+                .entry(spark.id.clone())
+                .or_default()
+                .push(SparkTraceStep {
+                    spark_id: spark.id.clone(),
+                    node_id: node_id.clone(),
+                    event: "manual-resolved".to_owned(),
+                    edge_id: None,
+                    reason: Some("manual gate resolved".to_owned()),
+                });
+            let spark_clone = spark.clone();
+            let epoch = state.epoch;
+            state.sparks.insert(spark.id.clone(), spark);
+            self.persist_state(&state)?;
+            (spark_clone, epoch)
+        };
+
+        self.emit(RuntimeEvent::ManualGateChanged {
+            spark_id: spark.id.clone(),
+            node_id: spark.current_node_id.clone(),
+            resolved: true,
+        });
+        self.emit(RuntimeEvent::NodeStatusChanged {
+            node_id: spark.current_node_id.clone(),
+            status: NodeStatus::Running,
+        });
+
+        let runtime = self.clone();
+        let spark_id = spark.id.clone();
+        tokio::spawn(async move {
+            runtime.drive_spark(spark_id, epoch).await;
+        });
+
+        Ok(spark)
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<RuntimeEvent> {
@@ -974,6 +1073,111 @@ mod tests {
             entry.spark_id == spark.id
                 && entry.reason.as_deref()
                     == Some("codex fixture path is required when recording is disabled")
+        }));
+    }
+
+    #[tokio::test]
+    async fn release_queue_resumes_blocked_accumulation_spark() {
+        let runtime = test_runtime(Graph {
+            id: "queue-graph".to_owned(),
+            name: "Queue".to_owned(),
+            nodes: vec![
+                GraphNode {
+                    id: "queue".to_owned(),
+                    kind: "std/accumulation".to_owned(),
+                    label: "Queue".to_owned(),
+                    position: GraphPosition { x: 0.0, y: 0.0 },
+                    config: serde_json::json!({ "locked": true }),
+                },
+                GraphNode {
+                    id: "next".to_owned(),
+                    kind: "debug/placeholder-echo".to_owned(),
+                    label: "Next".to_owned(),
+                    position: GraphPosition { x: 100.0, y: 0.0 },
+                    config: serde_json::json!({}),
+                },
+            ],
+            edges: vec![GraphEdge {
+                id: "queue-next".to_owned(),
+                source: "queue".to_owned(),
+                source_port: "out".to_owned(),
+                target: "next".to_owned(),
+                target_port: "in".to_owned(),
+                label: None,
+            }],
+        });
+
+        let spark = runtime
+            .ignite(IgniteSparkRequest {
+                node_id: "queue".to_owned(),
+                payload: serde_json::json!({ "ticket": 1 }),
+            })
+            .expect("spark should ignite");
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let released = runtime.release_queue("queue").expect("queue should release");
+        tokio::time::sleep(Duration::from_millis(600)).await;
+
+        let history = runtime.run_history().expect("history should load");
+        assert_eq!(released, 1);
+        assert!(history.iter().any(|entry| {
+            entry.spark_id == spark.id
+                && entry.final_status == SparkStatus::Completed
+                && entry.last_node_id == "next"
+        }));
+    }
+
+    #[tokio::test]
+    async fn resolve_manual_gate_resumes_waiting_spark() {
+        let runtime = test_runtime(Graph {
+            id: "manual-graph".to_owned(),
+            name: "Manual".to_owned(),
+            nodes: vec![
+                GraphNode {
+                    id: "gate".to_owned(),
+                    kind: "std/manual-accept".to_owned(),
+                    label: "Gate".to_owned(),
+                    position: GraphPosition { x: 0.0, y: 0.0 },
+                    config: serde_json::json!({ "prompt": "Approve?" }),
+                },
+                GraphNode {
+                    id: "next".to_owned(),
+                    kind: "debug/placeholder-echo".to_owned(),
+                    label: "Next".to_owned(),
+                    position: GraphPosition { x: 100.0, y: 0.0 },
+                    config: serde_json::json!({}),
+                },
+            ],
+            edges: vec![GraphEdge {
+                id: "gate-next".to_owned(),
+                source: "gate".to_owned(),
+                source_port: "out".to_owned(),
+                target: "next".to_owned(),
+                target_port: "in".to_owned(),
+                label: None,
+            }],
+        });
+
+        let spark = runtime
+            .ignite(IgniteSparkRequest {
+                node_id: "gate".to_owned(),
+                payload: serde_json::json!({ "ticket": 1 }),
+            })
+            .expect("spark should ignite");
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let resumed = runtime
+            .resolve_manual_gate(ResolveManualGateRequest {
+                spark_id: spark.id.clone(),
+                payload: Some(serde_json::json!({ "ticket": 1, "approved": true })),
+            })
+            .expect("manual gate should resolve");
+        tokio::time::sleep(Duration::from_millis(600)).await;
+
+        let history = runtime.run_history().expect("history should load");
+        assert_eq!(resumed.payload["manualAccepted"], true);
+        assert!(history.iter().any(|entry| {
+            entry.spark_id == spark.id
+                && entry.final_status == SparkStatus::Completed
+                && entry.last_node_id == "next"
         }));
     }
 }

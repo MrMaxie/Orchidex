@@ -6,6 +6,7 @@ import type {
   CoreGraph,
   CoreNodeCatalogResponse,
   IgniteSparkInput,
+  ResolveManualGateInput,
   RuntimeEvent,
   Spark,
 } from "@/features/workspace/contracts";
@@ -23,6 +24,14 @@ export function createTauriIpcConnectionStrategy(): ConnectionStrategy {
         },
       }),
     extinguishSparks: () => invoke<number>("extinguish_sparks"),
+    releaseQueue: (nodeId: string) => invoke<number>("release_queue", { nodeId }),
+    resolveManualGate: (input: ResolveManualGateInput) =>
+      invoke<Spark>("resolve_manual_gate", {
+        request: {
+          sparkId: input.sparkId,
+          payload: input.payload,
+        },
+      }),
     subscribe: (handler) => {
       let unsubscribe: (() => void) | null = null;
       void listen<RuntimeEvent>("orchidex://runtime-event", (event) => {
