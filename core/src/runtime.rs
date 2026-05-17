@@ -2,7 +2,7 @@ use crate::models::{
     default_graph, Graph, IgniteSparkRequest, NodeCatalogResponse, NodeStatus, RuntimeEvent, Spark,
     SparkStatus,
 };
-use crate::nodes::discover_node_catalog;
+use crate::nodes::{discover_node_catalog, NodeRegistry};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
@@ -14,6 +14,10 @@ use uuid::Uuid;
 pub enum RuntimeError {
     #[error("node '{0}' does not exist")]
     MissingNode(String),
+    #[error("graph validation failed: {0}")]
+    InvalidGraph(String),
+    #[error("failed to load node registry: {0}")]
+    NodeRegistry(String),
     #[error("runtime lock is poisoned")]
     LockPoisoned,
 }
@@ -54,6 +58,7 @@ impl RuntimeHandle {
     }
 
     pub fn replace_graph(&self, graph: Graph) -> Result<Graph, RuntimeError> {
+        self.validate_graph(&graph)?;
         let mut events = vec![RuntimeEvent::GraphUpdated {
             graph: graph.clone(),
         }];
@@ -85,6 +90,7 @@ impl RuntimeHandle {
     }
 
     pub fn ignite(&self, request: IgniteSparkRequest) -> Result<Spark, RuntimeError> {
+        self.validate_graph(&self.graph()?)?;
         let (spark, epoch) = {
             let mut state = self.state.lock().map_err(|_| RuntimeError::LockPoisoned)?;
             if !state
@@ -151,6 +157,22 @@ impl RuntimeHandle {
 
     pub fn node_catalog(&self) -> NodeCatalogResponse {
         discover_node_catalog(workspace_nodes_dir())
+    }
+
+    fn validate_graph(&self, graph: &Graph) -> Result<(), RuntimeError> {
+        let registry = NodeRegistry::load_from(workspace_nodes_dir())
+            .map_err(|error| RuntimeError::NodeRegistry(error.to_string()))?;
+        let diagnostics = registry.validate_graph_edges(graph);
+        if diagnostics.is_empty() {
+            return Ok(());
+        }
+
+        let summary = diagnostics
+            .into_iter()
+            .map(|diagnostic| format!("{}: {}", diagnostic.edge_id, diagnostic.message))
+            .collect::<Vec<_>>()
+            .join("; ");
+        Err(RuntimeError::InvalidGraph(summary))
     }
 
     async fn drive_spark(&self, spark_id: String, epoch: u64) {
@@ -339,5 +361,44 @@ mod tests {
             }
         }
         assert!(saw_blocked);
+    }
+
+    #[test]
+    fn rejects_graphs_with_unknown_ports() {
+        let runtime = RuntimeHandle::demo();
+        let error = runtime
+            .replace_graph(Graph {
+                id: "test".to_owned(),
+                name: "Test".to_owned(),
+                nodes: vec![
+                    GraphNode {
+                        id: "a".to_owned(),
+                        kind: "std/manual-ignite".to_owned(),
+                        label: "A".to_owned(),
+                        position: GraphPosition { x: 0.0, y: 0.0 },
+                        config: serde_json::json!({}),
+                    },
+                    GraphNode {
+                        id: "b".to_owned(),
+                        kind: "std/transmute".to_owned(),
+                        label: "B".to_owned(),
+                        position: GraphPosition { x: 1.0, y: 0.0 },
+                        config: serde_json::json!({}),
+                    },
+                ],
+                edges: vec![GraphEdge {
+                    id: "broken".to_owned(),
+                    source: "a".to_owned(),
+                    source_port: "missing".to_owned(),
+                    target: "b".to_owned(),
+                    target_port: "in".to_owned(),
+                    label: None,
+                }],
+            })
+            .expect_err("invalid graph should be rejected");
+
+        assert!(error
+            .to_string()
+            .contains("source port 'missing' is not defined"));
     }
 }

@@ -56,6 +56,20 @@ export type CoreNodeCatalogEntry = {
   configSchema: Record<string, JsonValue>;
   inputSchema: Record<string, JsonValue>;
   outputSchema: Record<string, JsonValue>;
+  inputPorts: CoreNodePortDefinition[];
+  outputPorts: CoreNodePortDefinition[];
+};
+
+export type CoreNodePortDirection = "input" | "output";
+
+export type CoreNodePortCardinality = "one" | "many";
+
+export type CoreNodePortDefinition = {
+  id: string;
+  label: string;
+  direction: CoreNodePortDirection;
+  schemaHints: Record<string, JsonValue>;
+  cardinality: CoreNodePortCardinality;
 };
 
 export type CoreNodeCatalogDiagnostic = {

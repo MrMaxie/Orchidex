@@ -55,6 +55,33 @@ pub fn default_target_port() -> String {
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub enum PortDirection {
+    Input,
+    Output,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum PortCardinality {
+    #[default]
+    One,
+    Many,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct NodePortDefinition {
+    pub id: String,
+    pub label: String,
+    pub direction: PortDirection,
+    #[serde(default)]
+    pub schema_hints: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub cardinality: PortCardinality,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub enum NodeStatus {
     Idle,
     Queued,
@@ -163,6 +190,10 @@ pub struct NodeCatalogEntry {
     pub input_schema: BTreeMap<String, Value>,
     #[serde(default)]
     pub output_schema: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub input_ports: Vec<NodePortDefinition>,
+    #[serde(default)]
+    pub output_ports: Vec<NodePortDefinition>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -172,6 +203,17 @@ pub struct NodeCatalogDiagnostic {
     pub message: String,
     #[serde(default)]
     pub node_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphValidationDiagnostic {
+    pub edge_id: String,
+    pub message: String,
+    #[serde(default)]
+    pub source_node_id: Option<String>,
+    #[serde(default)]
+    pub target_node_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
