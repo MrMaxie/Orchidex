@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "skills": {
+    "calling-frontend-from-tauri-rust": {
+      "source": "dchuk/claude-code-tauri-skills",
+      "sourceType": "github",
+      "skillPath": "tauri/tauri-calling-frontend/SKILL.md",
+      "computedHash": "974705471977d53c6e075eb4a8b90da6315a8c716e03bc888dec88478a7b85a4"
+    },
+    "codex-autoresearch-loop": {
+      "source": "aradotso/trending-skills",
+      "sourceType": "github",
+      "skillPath": "skills/codex-autoresearch-loop/SKILL.md",
+      "computedHash": "c5488d21f3ab8eaa4dfa87f0bc4196af90f344ae70f1f6d7274b7ce91ddddec2"
+    },
+    "codex-bug": {
+      "source": "openai/codex",
+      "sourceType": "github",
+      "skillPath": ".codex/skills/codex-bug/SKILL.md",
+      "computedHash": "98d5c9b9b6ac6539953d61cf7a31d13fe5fa5d119f37065bcfe4892ba933b076"
+    },
+    "codex-claude-cursor-loop": {
+      "source": "bear2u/my-skills",
+      "sourceType": "github",
+      "skillPath": "skills/codex-claude-cursor-loop/SKILL.md",
+      "computedHash": "9ecc776cc7665aff6aada7c48786b346fb021e9f23b2a1d3fa1c9c92c4c4c46c"
+    },
+    "codex-claude-loop": {
+      "source": "bear2u/my-skills",
+      "sourceType": "github",
+      "skillPath": "skills/codex-claude-loop/SKILL.md",
+      "computedHash": "53043fffb47dc3fa4a4d88bdda4fdf3cea2bb61011e94392c33a4dfaa8fa5d51"
+    },
+    "codex-skill": {
+      "source": "feiskyer/claude-code-settings",
+      "sourceType": "github",
+      "skillPath": "skills/codex-skill/SKILL.md",
+      "computedHash": "6b930a3e54ecbce5a5abbd6069d1ede566bc934bf7bc3d2fcc03f5835a2b884f"
+    },
+    "loop-codex-review": {
+      "source": "corygabrielsen/skills",
+      "sourceType": "github",
+      "skillPath": "loop-codex-review/SKILL.md",
+      "computedHash": "8d7447de03e67415fc4c23a2b2a9ebcc2dd6797e9fac57e333eb9c22afdf1ac2"
+    },
+    "mcp-protocol-builder": {
+      "source": "bobmatnyc/claude-mpm-skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/toolchains-ai-protocols/SKILL.md",
+      "computedHash": "0893bf448cc1730a7bf60309098b23b2462c56ccaf360ff21d1fea2b5d5675dd"
+    },
+    "react-flow-architect": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-flow-architect/SKILL.md",
+      "computedHash": "152a21279ee1400c6471a38646e06adab80547bd88679ae7e0db0bce6e0641f9"
+    },
+    "reactflow-expert": {
+      "source": "erichowens/some_claude_skills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/reactflow-expert/SKILL.md",
+      "computedHash": "c3529b6932dfe5904365eb22b27dffd76028437a9d85bb6fb5b6f8d5332899d5"
+    },
+    "run-codex-exec": {
+      "source": "yigitkonur/skills-by-yigitkonur",
+      "sourceType": "github",
+      "skillPath": "skills/run-codex-exec/skills/run-codex-exec/SKILL.md",
+      "computedHash": "fba71c8ee3d024a57d6c31e7a14e4df7cd1e7468c01bb2f3a70258c94a041ab5"
+    },
+    "rust-tauri-backend": {
+      "source": "xiaolai/vmark",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/rust-tauri-backend/SKILL.md",
+      "computedHash": "3ec9d9c099d47d7698800d275054b2ebd273c337a36309a638d54eb870113218"
+    },
+    "tauri-development": {
+      "source": "mindrally/skills",
+      "sourceType": "github",
+      "skillPath": "tauri-development/SKILL.md",
+      "computedHash": "70524b334f77c98964e79597b10936c36aa9329e117669d9f0bb8ab3f965c6a5"
+    }
+  }
+}
