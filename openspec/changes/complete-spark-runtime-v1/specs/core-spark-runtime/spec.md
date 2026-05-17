@@ -11,6 +11,17 @@ The v1 runtime SHALL keep authoritative in-process state for active execution an
 - **WHEN** a spark changes status, location, queue state, or diagnostic state
 - **THEN** the runtime updates in-process state and records the change through the v1 persistence layer
 
+### Requirement: Spark-derived workflow activity
+The v1 runtime SHALL represent active work through spark state and SHALL NOT require a separate workflow-level start, stop, running, or stopped state.
+
+#### Scenario: No sparks are active
+- **WHEN** a graph has no active, waiting, blocked, or queued sparks
+- **THEN** the runtime reports no active work for that graph without mutating workflow-level status
+
+#### Scenario: Sparks are active
+- **WHEN** one or more sparks are active, waiting, queued, blocked, failed, completed, or extinguished
+- **THEN** clients derive workflow activity from the spark summaries and emitted runtime events
+
 ### Requirement: Spark ignition
 The v1 runtime SHALL ignite sparks at valid graph nodes, valid graph portal entries, or runtime-supported scheduled entrypoints, and SHALL reject unknown entrypoints with deterministic errors.
 

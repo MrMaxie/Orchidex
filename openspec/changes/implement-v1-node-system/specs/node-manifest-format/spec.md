@@ -18,6 +18,17 @@ Node manifests SHALL support optional `capabilities`, `config_schema`, `input_sc
 - **WHEN** a manifest includes schema hints
 - **THEN** those hints are included in the generated node catalog entry
 
+### Requirement: Manifest port definitions
+Node manifests SHALL support stable input and output port definitions, where each port includes an id, label, direction, optional schema hints, and connection cardinality.
+
+#### Scenario: Manifest declares ports
+- **WHEN** a manifest includes input or output port definitions
+- **THEN** the registry validates the port ids, directions, schema hints, and cardinality before exposing the node as executable
+
+#### Scenario: Manifest omits ports
+- **WHEN** a legacy or simple node manifest omits explicit port definitions
+- **THEN** the registry assigns deterministic default input and output ports for graph editing and runtime routing
+
 ### Requirement: Node id convention
 Node ids SHALL match their namespace path convention, such as `nodes/std/manual-ignite` using `std/manual-ignite`, and v1 validation SHALL report mismatches as broken catalog entries.
 
