@@ -1,0 +1,13 @@
+id = "std/accumulation"
+label = "Accumulation"
+description = "Queues incoming sparks and releases them by configured order and lock state."
+entrypoint = "main.rhai"
+capabilities = ["queue", "gate"]
+
+[config_schema.order]
+type = "string"
+enum = ["fifo", "lifo", "priority"]
+
+[config_schema.locked]
+type = "boolean"
+description = "Blocks output while true."

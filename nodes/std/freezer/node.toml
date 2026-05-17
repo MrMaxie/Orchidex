@@ -1,0 +1,9 @@
+id = "std/freezer"
+label = "Freezer"
+description = "Returns a permanently stored response when available, otherwise executes and freezes the result."
+entrypoint = "main.rhai"
+capabilities = ["memory", "freeze"]
+
+[config_schema.key]
+type = "string"
+description = "Stable memory key for frozen output."

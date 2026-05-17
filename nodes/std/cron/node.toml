@@ -1,0 +1,9 @@
+id = "std/cron"
+label = "Cron"
+description = "Ignites work on a configured schedule."
+entrypoint = "main.rhai"
+capabilities = ["scheduler", "spark-start"]
+
+[config_schema.schedule]
+type = "string"
+description = "Cron-like schedule expression."

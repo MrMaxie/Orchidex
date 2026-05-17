@@ -1,0 +1,9 @@
+id = "std/manual-accept"
+label = "Manual Accept"
+description = "Pauses a spark until a user manually accepts or rejects it."
+entrypoint = "main.rhai"
+capabilities = ["human-gate", "debug"]
+
+[config_schema.prompt]
+type = "string"
+description = "Acceptance prompt shown to the user."

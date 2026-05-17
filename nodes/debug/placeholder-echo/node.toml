@@ -1,0 +1,9 @@
+id = "debug/placeholder-echo"
+label = "Placeholder Echo"
+description = "Carries an optional note and emits the same payload it receives."
+entrypoint = "main.rhai"
+capabilities = ["debug", "placeholder"]
+
+[config_schema.note]
+type = "string"
+description = "Human note stored on the placeholder."

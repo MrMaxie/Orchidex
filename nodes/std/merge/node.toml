@@ -1,0 +1,9 @@
+id = "std/merge"
+label = "Merge"
+description = "Merges compatible incoming spark payloads into a single outgoing payload."
+entrypoint = "main.rhai"
+capabilities = ["merge"]
+
+[config_schema.strategy]
+type = "string"
+enum = ["object", "array", "latest"]

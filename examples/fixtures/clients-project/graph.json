@@ -1,0 +1,60 @@
+{
+  "id": "clients-project",
+  "name": "Clients project",
+  "nodes": [
+    {
+      "id": "manual-start",
+      "kind": "std/manual-ignite",
+      "label": "Manual intake",
+      "position": { "x": 0, "y": 120 },
+      "config": {
+        "form": [
+          { "name": "source", "type": "select", "options": ["mail", "manual"] },
+          { "name": "priority", "type": "radio", "options": ["normal", "urgent"] }
+        ]
+      }
+    },
+    {
+      "id": "mail-accumulation",
+      "kind": "std/accumulation",
+      "label": "Mail queue",
+      "position": { "x": 300, "y": 120 },
+      "config": { "order": "fifo", "locked": false }
+    },
+    {
+      "id": "extract-work",
+      "kind": "std/transmute",
+      "label": "Extract work items",
+      "position": { "x": 600, "y": 120 },
+      "config": { "script": "payload" }
+    },
+    {
+      "id": "codex-branch",
+      "kind": "codex/exec",
+      "label": "Select branch",
+      "position": { "x": 900, "y": 60 },
+      "config": {
+        "model": "5.3-Codex-Spark",
+        "effort": "medium",
+        "fixture": "examples/fixtures/clients-project/codex-select-branch.json"
+      }
+    },
+    {
+      "id": "codex-plan",
+      "kind": "codex/exec",
+      "label": "Split tasks",
+      "position": { "x": 1200, "y": 120 },
+      "config": {
+        "model": "5.3",
+        "effort": "high",
+        "fixture": "examples/fixtures/clients-project/codex-split-tasks.json"
+      }
+    }
+  ],
+  "edges": [
+    { "id": "manual-to-queue", "source": "manual-start", "target": "mail-accumulation", "label": "release" },
+    { "id": "queue-to-extract", "source": "mail-accumulation", "target": "extract-work", "label": "one by one" },
+    { "id": "extract-to-branch", "source": "extract-work", "target": "codex-branch", "label": "task payload" },
+    { "id": "branch-to-plan", "source": "codex-branch", "target": "codex-plan", "label": "ready branch" }
+  ]
+}

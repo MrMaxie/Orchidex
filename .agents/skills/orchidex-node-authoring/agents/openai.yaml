@@ -1,0 +1,4 @@
+interface:
+  display_name: "Orchidex Node Authoring"
+  short_description: "Author Orchidex node folders and Rhai."
+  default_prompt: "Create or update an Orchidex node using node.toml and main.rhai."

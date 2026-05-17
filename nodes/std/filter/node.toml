@@ -1,0 +1,9 @@
+id = "std/filter"
+label = "Filter"
+description = "Filters incoming sparks with a Rhai predicate over the payload."
+entrypoint = "main.rhai"
+capabilities = ["rhai", "filter"]
+
+[config_schema.predicate]
+type = "string"
+description = "Rhai predicate returning true when the spark may continue."

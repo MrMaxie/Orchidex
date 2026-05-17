@@ -1,0 +1,9 @@
+id = "debug/placeholder-rhai"
+label = "Placeholder Rhai"
+description = "Carries an optional note and emits a transformed payload."
+entrypoint = "main.rhai"
+capabilities = ["debug", "rhai", "placeholder"]
+
+[config_schema.note]
+type = "string"
+description = "Human note stored on the placeholder."

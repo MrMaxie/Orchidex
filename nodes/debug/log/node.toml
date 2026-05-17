@@ -1,0 +1,9 @@
+id = "debug/log"
+label = "Log"
+description = "Logs spark payload data to console or file for debugging."
+entrypoint = "main.rhai"
+capabilities = ["debug", "log"]
+
+[config_schema.target]
+type = "string"
+enum = ["console", "file"]

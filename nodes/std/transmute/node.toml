@@ -1,0 +1,9 @@
+id = "std/transmute"
+label = "Transmute"
+description = "Runs Rhai to transform an incoming spark payload into an outgoing payload."
+entrypoint = "main.rhai"
+capabilities = ["rhai", "transform"]
+
+[config_schema.script]
+type = "string"
+description = "Rhai expression or script used to transform payload."

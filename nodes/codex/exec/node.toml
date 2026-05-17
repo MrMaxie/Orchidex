@@ -1,0 +1,17 @@
+id = "codex/exec"
+label = "Codex Exec"
+description = "Builds a Codex CLI prompt from spark data and returns the Codex response as output."
+entrypoint = "main.rhai"
+capabilities = ["codex", "cli", "fixture-first"]
+
+[config_schema.model]
+type = "string"
+description = "Codex model name, for example 5.3-Codex-Spark."
+
+[config_schema.effort]
+type = "string"
+enum = ["low", "medium", "high", "xhigh"]
+
+[config_schema.fixture]
+type = "string"
+description = "Fixture response path used unless explicit recording is enabled."

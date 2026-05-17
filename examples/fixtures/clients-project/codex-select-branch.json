@@ -1,0 +1,10 @@
+{
+  "recording": false,
+  "model": "5.3-Codex-Spark",
+  "effort": "medium",
+  "response": {
+    "branch": "feat/clients-project-mail-review",
+    "action": "switch-or-create",
+    "summary": "Use the clients project branch for the mock review response."
+  }
+}

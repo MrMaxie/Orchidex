@@ -1,0 +1,14 @@
+{
+  "recording": false,
+  "model": "5.3",
+  "effort": "high",
+  "response": {
+    "tasks": [
+      "Collect mock review context",
+      "Update implementation plan",
+      "Run verification loop",
+      "Record rule improvements"
+    ],
+    "summary": "The fixture response prevents repeated Codex invocations during tests."
+  }
+}

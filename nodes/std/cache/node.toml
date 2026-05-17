@@ -1,0 +1,9 @@
+id = "std/cache"
+label = "Cache"
+description = "Maps known input payloads to prior output payloads and skips repeated work."
+entrypoint = "main.rhai"
+capabilities = ["cache"]
+
+[config_schema.method]
+type = "string"
+enum = ["exact", "hash", "accumulate"]

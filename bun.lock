@@ -4,6 +4,17 @@
   "workspaces": {
     "": {
       "name": "__orchidex_scaffold",
+    },
+    "tauri": {
+      "name": "@orchidex/tauri",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@tauri-apps/cli": "2.11.2",
+      },
+    },
+    "web": {
+      "name": "@orchidex/web",
+      "version": "0.1.0",
       "dependencies": {
         "@fontsource-variable/dosis": "5.2.8",
         "@fontsource-variable/fira-code": "5.2.7",
@@ -26,7 +37,6 @@
       },
       "devDependencies": {
         "@tailwindcss/vite": "4.3.0",
-        "@tauri-apps/cli": "2.11.2",
         "@types/react": "19.2.14",
         "@types/react-dom": "19.2.3",
         "@vitejs/plugin-react": "6.0.2",
@@ -166,6 +176,10 @@
     "@open-draft/logger": ["@open-draft/logger@0.3.0", "", { "dependencies": { "is-node-process": "^1.2.0", "outvariant": "^1.4.0" } }, "sha512-X2g45fzhxH238HKO4xbSr7+wBS8Fvw6ixhTDuvLd5mqh6bJJCFAPwU9mPDxbcrRtfxv4u5IHCEH77BmxvXmmxQ=="],
 
     "@open-draft/until": ["@open-draft/until@2.1.0", "", {}, "sha512-U69T3ItWHvLwGg5eJ0n3I62nWuE6ilHlmz7zM0npLBRvPRd7e6NYmg54vvRtP5mZG7kZqZCFVdsTWo7BPtBujg=="],
+
+    "@orchidex/tauri": ["@orchidex/tauri@workspace:tauri"],
+
+    "@orchidex/web": ["@orchidex/web@workspace:web"],
 
     "@oxc-project/types": ["@oxc-project/types@0.130.0", "", {}, "sha512-ibD2usx9JRu7f5pu2tMKMI4cpA4NgXJQoYRP4pQ7Pxmn1l6k/53qWtQWZayhYy3X4QZkt90Ot+mJEaeXouio6Q=="],
 

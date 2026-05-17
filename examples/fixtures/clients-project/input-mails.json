@@ -1,0 +1,16 @@
+[
+  {
+    "id": "mail-001",
+    "from": "review@example.test",
+    "subject": "PR review answered",
+    "keywords": ["pull-request", "answered", "backend"],
+    "body": "The backend review thread has a new answer and should return to the implementation queue."
+  },
+  {
+    "id": "mail-002",
+    "from": "jira@example.test",
+    "subject": "Jira task changed",
+    "keywords": ["jira", "status-changed", "frontend"],
+    "body": "The frontend task moved out of blocked status and can be planned again."
+  }
+]

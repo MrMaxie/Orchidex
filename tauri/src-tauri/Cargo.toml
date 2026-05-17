@@ -1,0 +1,22 @@
+[package]
+name = "orchidex-tauri"
+description = "Orchidex desktop shell."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+name = "orchidex_tauri_lib"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { workspace = true, features = [] }
+
+[dependencies]
+orchidex-core = { path = "../../core" }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tauri = { workspace = true, features = [] }
+tauri-plugin-opener = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }

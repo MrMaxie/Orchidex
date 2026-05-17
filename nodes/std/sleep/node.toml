@@ -1,0 +1,9 @@
+id = "std/sleep"
+label = "Sleep"
+description = "Delays spark execution according to payload or node configuration."
+entrypoint = "main.rhai"
+capabilities = ["scheduler", "delay"]
+
+[config_schema.delay_ms]
+type = "number"
+description = "Default delay in milliseconds."

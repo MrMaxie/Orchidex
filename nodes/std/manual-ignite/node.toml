@@ -1,0 +1,9 @@
+id = "std/manual-ignite"
+label = "Manual Ignite"
+description = "Starts a spark from user-provided structured form data."
+entrypoint = "main.rhai"
+capabilities = ["manual-input", "spark-start"]
+
+[config_schema.form]
+type = "array"
+description = "Form fields used to collect the initial spark payload."

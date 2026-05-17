@@ -1,0 +1,9 @@
+id = "debug/note"
+label = "Note"
+description = "Stores a visual note on the graph without inputs or outputs."
+entrypoint = "main.rhai"
+capabilities = ["debug", "note"]
+
+[config_schema.note]
+type = "string"
+description = "Human note shown on the graph."

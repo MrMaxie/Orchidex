@@ -1,4 +1,8 @@
-.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/orchidex-node-authoring/
+!.agents/skills/orchidex-node-authoring/**
 
 # Logs
 logs
@@ -10,9 +14,11 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+target
 dist
 dist-ssr
-src-tauri/target
+tauri/src-tauri/target
+.playwright-mcp
 *.local
 
 # Editor directories and files

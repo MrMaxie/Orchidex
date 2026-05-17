@@ -1,0 +1,29 @@
+[package]
+name = "orchidex-core"
+description = "Orchidex graph runtime, node registry, CLI, and HTTP server."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+name = "orchidex_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "orchidex-core"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+axum = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+rhai = { workspace = true, features = ["serde"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
+tokio-stream = { workspace = true, features = ["sync"] }
+toml = { workspace = true }
+tower-http = { workspace = true, features = ["cors"] }
+uuid = { workspace = true, features = ["v4", "serde"] }
