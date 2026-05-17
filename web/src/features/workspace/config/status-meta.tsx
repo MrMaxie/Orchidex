@@ -9,7 +9,8 @@ import {
 } from "@tabler/icons-react";
 import type * as React from "react";
 
-import type { NodeStatus, ProjectStatus } from "@/features/workspace/types";
+import type { WorkflowActivityStatus } from "@/features/workspace/contracts";
+import type { NodeStatus } from "@/features/workspace/types";
 
 type StatusIcon = React.ForwardRefExoticComponent<
   IconProps & React.RefAttributes<SVGSVGElement>
@@ -23,7 +24,7 @@ export type StatusMeta = {
   badgeVariant: "default" | "secondary" | "destructive" | "outline";
 };
 
-export const projectStatusMeta: Record<ProjectStatus, StatusMeta> = {
+export const projectStatusMeta: Record<WorkflowActivityStatus, StatusMeta> = {
   draft: {
     label: "Draft",
     action: "Start run",

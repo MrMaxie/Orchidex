@@ -13,6 +13,24 @@ export type CoreGraph = {
   edges: CoreGraphEdge[];
 };
 
+export type CoreProjectMetadata = {
+  id: string;
+  name: string;
+  groupId: string;
+  cwd: string;
+  owner: string;
+  updatedAt: string;
+  description: string;
+  trigger: string;
+};
+
+export type CoreWorkflowGraph = {
+  id: string;
+  projectId: string;
+  name: string;
+  graph: CoreGraph;
+};
+
 export type CoreGraphNode = {
   id: string;
   kind: string;
@@ -52,6 +70,21 @@ export type CoreNodeCatalogResponse = {
 };
 
 export type SparkStatus = "active" | "blocked" | "completed" | "extinguished";
+
+export type WorkflowActivityStatus = "draft" | "idle" | "running" | "blocked";
+
+export type WorkflowActivitySummary = {
+  status: WorkflowActivityStatus;
+  progress: number;
+  activeSparkCount: number;
+  blockedSparkCount: number;
+  completedSparkCount: number;
+  extinguishedSparkCount: number;
+};
+
+export type WorkspaceNavigationState = {
+  lastOpenedWorkflowId: string | null;
+};
 
 export type Spark = {
   id: string;

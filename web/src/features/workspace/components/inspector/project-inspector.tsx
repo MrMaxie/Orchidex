@@ -6,33 +6,19 @@ import {
   FieldSeparator,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { projectStatusMeta } from "@/features/workspace/config/status-meta";
-import type {
-  Project,
-  ProjectField,
-  ProjectStatus,
-} from "@/features/workspace/types";
+import type { Project, ProjectField } from "@/features/workspace/types";
 
 export function ProjectInspector({
   onFieldChange,
-  onStatusChange,
   project,
 }: {
   onFieldChange: (field: ProjectField, value: string) => void;
-  onStatusChange: (status: ProjectStatus) => void;
   project: Project;
 }) {
-  const status = projectStatusMeta[project.status];
+  const status = projectStatusMeta[project.activity.status];
   const StatusIcon = status.icon;
 
   return (
@@ -45,9 +31,11 @@ export function ProjectInspector({
           stroke={1.7}
         />
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-foreground">{project.name}</p>
+          <p className="text-xs font-medium text-foreground">
+            {project.metadata.name}
+          </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {project.owner} · {project.updatedAt}
+            {project.metadata.owner} · {project.metadata.updatedAt}
           </p>
         </div>
         <Badge variant={status.badgeVariant}>{status.label}</Badge>
@@ -65,7 +53,15 @@ export function ProjectInspector({
             <Input
               id="project-name"
               onChange={(event) => onFieldChange("name", event.currentTarget.value)}
-              value={project.name}
+              value={project.metadata.name}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="project-cwd">Working directory</FieldLabel>
+            <Input
+              id="project-cwd"
+              onChange={(event) => onFieldChange("cwd", event.currentTarget.value)}
+              value={project.metadata.cwd}
             />
           </Field>
           <Field>
@@ -75,7 +71,7 @@ export function ProjectInspector({
               onChange={(event) =>
                 onFieldChange("owner", event.currentTarget.value)
               }
-              value={project.owner}
+              value={project.metadata.owner}
             />
           </Field>
           <Field>
@@ -85,28 +81,8 @@ export function ProjectInspector({
               onChange={(event) =>
                 onFieldChange("trigger", event.currentTarget.value)
               }
-              value={project.trigger}
+              value={project.metadata.trigger}
             />
-          </Field>
-          <Field>
-            <FieldLabel>Status</FieldLabel>
-            <Select
-              onValueChange={(value) => onStatusChange(value as ProjectStatus)}
-              value={project.status}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {Object.entries(projectStatusMeta).map(([value, meta]) => (
-                    <SelectItem key={value} value={value}>
-                      {meta.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
           </Field>
           <Field>
             <FieldLabel htmlFor="project-description">Description</FieldLabel>
@@ -115,7 +91,7 @@ export function ProjectInspector({
               onChange={(event) =>
                 onFieldChange("description", event.currentTarget.value)
               }
-              value={project.description}
+              value={project.metadata.description}
             />
           </Field>
         </FieldGroup>
@@ -124,9 +100,9 @@ export function ProjectInspector({
       <FieldSeparator>Graph</FieldSeparator>
 
       <section className="grid grid-cols-3 gap-2 text-xs">
-        <Metric label="Nodes" value={project.nodes.length.toString()} />
-        <Metric label="Edges" value={project.edges.length.toString()} />
-        <Metric label="Ready" value={`${project.progress}%`} />
+        <Metric label="Nodes" value={project.workflow.nodes.length.toString()} />
+        <Metric label="Edges" value={project.workflow.edges.length.toString()} />
+        <Metric label="Ready" value={`${project.activity.progress}%`} />
       </section>
     </div>
   );

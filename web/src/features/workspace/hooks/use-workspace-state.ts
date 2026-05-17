@@ -15,21 +15,31 @@ import {
   projectFromCoreGraph,
   workflowToCoreGraph,
 } from "@/features/workspace/data/mock-projects";
-import type { ConnectionStrategy, RuntimeEvent, Spark } from "@/features/workspace/contracts";
+import type {
+  ConnectionStrategy,
+  RuntimeEvent,
+  Spark,
+  WorkspaceNavigationState,
+} from "@/features/workspace/contracts";
 import type {
   CatalogDiagnostic,
   CatalogNode,
   InspectorTab,
   Project,
   ProjectField,
-  ProjectStatus,
   WorkflowNode,
   WorkflowNodeData,
 } from "@/features/workspace/types";
 
+const workspaceNavigationStorageKey = "orchidex.workspace.navigation";
+
 export function useWorkspaceState(connection: ConnectionStrategy | null) {
   const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [activeProjectId, setActiveProjectId] = useState(initialProjects[0].id);
+  const [navigationState, setNavigationState] =
+    useState<WorkspaceNavigationState>(readWorkspaceNavigationState);
+  const [activeProjectId, setActiveProjectId] = useState(
+    navigationState.lastOpenedWorkflowId ?? initialProjects[0].metadata.id,
+  );
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>("manual-start");
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("node");
   const [isCatalogOpen, setCatalogOpen] = useState(false);
@@ -38,32 +48,32 @@ export function useWorkspaceState(connection: ConnectionStrategy | null) {
 
   const activeProject = useMemo(
     () =>
-      projects.find((project) => project.id === activeProjectId) ?? projects[0],
+      projects.find((project) => project.metadata.id === activeProjectId) ?? projects[0],
     [activeProjectId, projects],
   );
 
   const activeNode = useMemo(
     () =>
-      activeProject.nodes.find((node) => node.id === selectedNodeId) ?? null,
-    [activeProject.nodes, selectedNodeId],
+      activeProject.workflow.nodes.find((node) => node.id === selectedNodeId) ?? null,
+    [activeProject.workflow.nodes, selectedNodeId],
   );
 
   const visibleNodes = useMemo(
     () =>
-      activeProject.nodes.map((node) => ({
+      activeProject.workflow.nodes.map((node) => ({
         ...node,
         selected: node.id === selectedNodeId,
       })),
-    [activeProject.nodes, selectedNodeId],
+    [activeProject.workflow.nodes, selectedNodeId],
   );
 
-  const isRunning = activeProject.status === "running";
+  const isRunning = activeProject.activity.status === "running";
 
   const updateActiveProject = useCallback(
     (updater: (project: Project) => Project) => {
       setProjects((currentProjects) =>
         currentProjects.map((project) =>
-          project.id === activeProjectId ? updater(project) : project,
+          project.metadata.id === activeProjectId ? updater(project) : project,
         ),
       );
     },
@@ -109,7 +119,7 @@ export function useWorkspaceState(connection: ConnectionStrategy | null) {
     const unsubscribe = connection.subscribe((event) => {
       setProjects((currentProjects) =>
         currentProjects.map((project) =>
-          project.id === activeProjectId ? applyRuntimeEvent(project, event) : project,
+          project.metadata.id === activeProjectId ? applyRuntimeEvent(project, event) : project,
         ),
       );
     });
@@ -134,7 +144,10 @@ export function useWorkspaceState(connection: ConnectionStrategy | null) {
       updateActiveProject((project) => {
         const nextProject = {
           ...project,
-          nodes: applyNodeChanges(changes, project.nodes),
+          workflow: {
+            ...project.workflow,
+            nodes: applyNodeChanges(changes, project.workflow.nodes),
+          },
         };
         publishGraph(nextProject);
         return nextProject;
@@ -148,7 +161,10 @@ export function useWorkspaceState(connection: ConnectionStrategy | null) {
       updateActiveProject((project) => {
         const nextProject = {
           ...project,
-          edges: applyEdgeChanges(changes, project.edges),
+          workflow: {
+            ...project.workflow,
+            edges: applyEdgeChanges(changes, project.workflow.edges),
+          },
         };
         publishGraph(nextProject);
         return nextProject;
@@ -162,19 +178,22 @@ export function useWorkspaceState(connection: ConnectionStrategy | null) {
       updateActiveProject((project) => {
         const nextProject = {
           ...project,
-          edges: addEdge(
-            {
-              ...connectionParams,
-              animated: true,
-              sourceHandle: connectionParams.sourceHandle ?? "out",
-              targetHandle: connectionParams.targetHandle ?? "in",
-              data: {
-                routingLabel: null,
+          workflow: {
+            ...project.workflow,
+            edges: addEdge(
+              {
+                ...connectionParams,
+                animated: true,
+                sourceHandle: connectionParams.sourceHandle ?? "out",
+                targetHandle: connectionParams.targetHandle ?? "in",
+                data: {
+                  routingLabel: null,
+                },
+                style: { stroke: "var(--workflow-edge)", strokeWidth: 2 },
               },
-              style: { stroke: "var(--workflow-edge)", strokeWidth: 2 },
-            },
-            project.edges,
-          ),
+              project.workflow.edges,
+            ),
+          },
         };
         publishGraph(nextProject);
         return nextProject;
@@ -185,20 +204,20 @@ export function useWorkspaceState(connection: ConnectionStrategy | null) {
 
   const selectProject = (projectId: string) => {
     setActiveProjectId(projectId);
+    writeWorkspaceNavigationState({ lastOpenedWorkflowId: projectId });
+    setNavigationState({ lastOpenedWorkflowId: projectId });
     setSelectedNodeId(null);
     setInspectorTab("project");
   };
 
   const updateProjectField = (field: ProjectField, value: string) => {
-    updateActiveProject((project) => ({ ...project, [field]: value }));
-  };
-
-  const updateProjectStatus = (status: ProjectStatus) => {
     updateActiveProject((project) => ({
       ...project,
-      status,
-      progress:
-        status === "running" ? Math.max(project.progress, 18) : project.progress,
+      metadata: { ...project.metadata, [field]: value },
+      workflow:
+        field === "name"
+          ? { ...project.workflow, name: value }
+          : project.workflow,
     }));
   };
 
@@ -213,11 +232,14 @@ export function useWorkspaceState(connection: ConnectionStrategy | null) {
     updateActiveProject((project) => {
       const nextProject = {
         ...project,
-        nodes: project.nodes.map((node) =>
-          node.id === selectedNodeId
-            ? { ...node, data: { ...node.data, [field]: value } }
-            : node,
-        ),
+        workflow: {
+          ...project.workflow,
+          nodes: project.workflow.nodes.map((node) =>
+            node.id === selectedNodeId
+              ? { ...node, data: { ...node.data, [field]: value } }
+              : node,
+          ),
+        },
       };
       publishGraph(nextProject);
       return nextProject;
@@ -226,7 +248,7 @@ export function useWorkspaceState(connection: ConnectionStrategy | null) {
 
   const addNodeFromCatalog = (catalogNode: CatalogNode) => {
     const nodeId = `${catalogNode.id.replace("/", "-")}-${Date.now().toString(36)}`;
-    const nodeCount = activeProject.nodes.length;
+    const nodeCount = activeProject.workflow.nodes.length;
     const nextNode: WorkflowNode = {
       id: nodeId,
       type: "workflowNode",
@@ -247,7 +269,10 @@ export function useWorkspaceState(connection: ConnectionStrategy | null) {
     updateActiveProject((project) => {
       const nextProject = {
         ...project,
-        nodes: [...project.nodes, nextNode],
+        workflow: {
+          ...project.workflow,
+          nodes: [...project.workflow.nodes, nextNode],
+        },
       };
       publishGraph(nextProject);
       return nextProject;
@@ -258,28 +283,25 @@ export function useWorkspaceState(connection: ConnectionStrategy | null) {
   };
 
   const igniteFromSelectedNode = () => {
-    const nodeId = selectedNodeId ?? activeProject.nodes[0]?.id;
+    const nodeId = selectedNodeId ?? activeProject.workflow.nodes[0]?.id;
     if (!nodeId) {
       return;
     }
-    updateProjectStatus("running");
     void connection
       ?.igniteSpark({
         nodeId,
         payload: {
           source: "web",
-          projectId: activeProject.id,
+          projectId: activeProject.metadata.id,
+          cwd: activeProject.metadata.cwd,
           startedAt: new Date().toISOString(),
         },
       })
-      .catch(() => {
-        updateProjectStatus("blocked");
-      });
+      .catch(() => undefined);
   };
 
   const extinguishSparks = () => {
     void connection?.extinguishSparks();
-    updateProjectStatus("idle");
   };
 
   const toggleRunState = () => {
@@ -300,6 +322,7 @@ export function useWorkspaceState(connection: ConnectionStrategy | null) {
     isCatalogOpen,
     isRunning,
     nodeCatalog,
+    navigationState,
     onConnect,
     onEdgesChange,
     onNodesChange,
@@ -311,7 +334,6 @@ export function useWorkspaceState(connection: ConnectionStrategy | null) {
     setSelectedNodeId,
     toggleRunState,
     updateProjectField,
-    updateProjectStatus,
     updateSelectedNode,
     visibleNodes,
   };
@@ -322,74 +344,86 @@ function applyRuntimeEvent(project: Project, event: RuntimeEvent): Project {
 
   switch (event.type) {
     case "graphUpdated":
-      return {
+      return withDerivedActivity({
         ...projectFromCoreGraph(event.graph),
+        metadata: {
+          ...project.metadata,
+          name: event.graph.name,
+        },
         sparks: project.sparks,
         eventLog,
-      };
+      });
     case "sparkIgnited":
-      return {
+      return withDerivedActivity({
         ...project,
-        status: "running",
         sparks: {
           ...project.sparks,
           [event.spark.id]: event.spark,
         },
-        nodes: markSpark(project.nodes, event.spark),
+        workflow: {
+          ...project.workflow,
+          nodes: markSpark(project.workflow.nodes, event.spark),
+        },
         eventLog,
-      };
+      });
     case "sparkMoved": {
       const spark = project.sparks[event.sparkId];
       const nextSpark = spark
         ? { ...spark, currentNodeId: event.toNodeId }
         : undefined;
-      return {
+      return withDerivedActivity({
         ...project,
         sparks: nextSpark
           ? { ...project.sparks, [event.sparkId]: nextSpark }
           : project.sparks,
-        edges: project.edges.map((edge) => ({
-          ...edge,
-          animated: edge.id === event.edgeId || edge.animated,
-          style: {
-            stroke:
-              edge.id === event.edgeId
-                ? "var(--workflow-status-running)"
-                : "var(--workflow-edge)",
-            strokeWidth: edge.id === event.edgeId ? 3 : 2,
-          },
-        })),
-        nodes: nextSpark ? markSpark(project.nodes, nextSpark) : project.nodes,
+        workflow: {
+          ...project.workflow,
+          edges: project.workflow.edges.map((edge) => ({
+            ...edge,
+            animated: edge.id === event.edgeId || edge.animated,
+            style: {
+              stroke:
+                edge.id === event.edgeId
+                  ? "var(--workflow-status-running)"
+                  : "var(--workflow-edge)",
+              strokeWidth: edge.id === event.edgeId ? 3 : 2,
+            },
+          })),
+          nodes: nextSpark
+            ? markSpark(project.workflow.nodes, nextSpark)
+            : project.workflow.nodes,
+        },
         eventLog,
-      };
+      });
     }
     case "nodeStatusChanged":
       return {
         ...project,
-        nodes: project.nodes.map((node) =>
-          node.id === event.nodeId
-            ? { ...node, data: { ...node.data, status: event.status } }
-            : node,
-        ),
+        workflow: {
+          ...project.workflow,
+          nodes: project.workflow.nodes.map((node) =>
+            node.id === event.nodeId
+              ? { ...node, data: { ...node.data, status: event.status } }
+              : node,
+          ),
+        },
         eventLog,
       };
     case "sparkBlocked":
-      return {
+      return withDerivedActivity({
         ...project,
-        status: "blocked",
         sparks: setSparkStatus(project.sparks, event.sparkId, "blocked"),
         eventLog,
-      };
+      });
     case "sparkExtinguished":
-      return {
+      return withDerivedActivity({
         ...project,
         sparks: setSparkStatus(project.sparks, event.sparkId, "extinguished"),
         eventLog,
-      };
+      });
     case "allSparksExtinguished":
-      return {
+      return withDerivedActivity({
         ...project,
-        status: "idle",
         sparks: Object.fromEntries(
           Object.entries(project.sparks).map(([id, spark]) => [
             id,
@@ -397,7 +431,7 @@ function applyRuntimeEvent(project: Project, event: RuntimeEvent): Project {
           ]),
         ),
         eventLog,
-      };
+      });
     case "log":
       return { ...project, eventLog };
   }
@@ -433,4 +467,59 @@ function setSparkStatus(
     ...sparks,
     [sparkId]: { ...spark, status },
   };
+}
+
+function withDerivedActivity(project: Project): Project {
+  return {
+    ...project,
+    activity: deriveWorkflowActivity(project.sparks),
+  };
+}
+
+function deriveWorkflowActivity(sparks: Record<string, Spark>): Project["activity"] {
+  const sparkList = Object.values(sparks);
+  const activeSparkCount = sparkList.filter((spark) => spark.status === "active").length;
+  const blockedSparkCount = sparkList.filter((spark) => spark.status === "blocked").length;
+  const completedSparkCount = sparkList.filter((spark) => spark.status === "completed").length;
+  const extinguishedSparkCount = sparkList.filter((spark) => spark.status === "extinguished").length;
+  const status =
+    blockedSparkCount > 0
+      ? "blocked"
+      : activeSparkCount > 0
+        ? "running"
+        : "idle";
+
+  return {
+    status,
+    progress:
+      sparkList.length === 0
+        ? 0
+        : Math.round(((completedSparkCount + extinguishedSparkCount) / sparkList.length) * 100),
+    activeSparkCount,
+    blockedSparkCount,
+    completedSparkCount,
+    extinguishedSparkCount,
+  };
+}
+
+function readWorkspaceNavigationState(): WorkspaceNavigationState {
+  try {
+    const rawValue = window.localStorage.getItem(workspaceNavigationStorageKey);
+    if (!rawValue) {
+      return { lastOpenedWorkflowId: null };
+    }
+    const parsedValue = JSON.parse(rawValue) as Partial<WorkspaceNavigationState>;
+    return {
+      lastOpenedWorkflowId:
+        typeof parsedValue.lastOpenedWorkflowId === "string"
+          ? parsedValue.lastOpenedWorkflowId
+          : null,
+    };
+  } catch {
+    return { lastOpenedWorkflowId: null };
+  }
+}
+
+function writeWorkspaceNavigationState(state: WorkspaceNavigationState) {
+  window.localStorage.setItem(workspaceNavigationStorageKey, JSON.stringify(state));
 }

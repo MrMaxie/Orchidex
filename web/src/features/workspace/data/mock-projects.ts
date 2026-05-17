@@ -83,19 +83,36 @@ const clientsProjectGraph: CoreGraph = {
 export const initialProjects: Project[] = [projectFromCoreGraph(clientsProjectGraph)];
 
 export function projectFromCoreGraph(graph: CoreGraph): Project {
+  const nodes = graph.nodes.map(toWorkflowNode);
+  const edges = graph.edges.map(toWorkflowEdge);
+
   return {
-    id: graph.id,
-    name: graph.name,
-    groupId: "automation",
-    status: "idle",
-    progress: 0,
-    owner: "Core",
-    updatedAt: "Live",
-    description: "Fixture-backed spark graph for clients-project acceptance work.",
-    trigger: "Manual ignite",
-    nodes: graph.nodes.map(toWorkflowNode),
-    edges: graph.edges.map(toWorkflowEdge),
-    coreGraph: graph,
+    metadata: {
+      id: graph.id,
+      name: graph.name,
+      groupId: "automation",
+      cwd: ".",
+      owner: "Core",
+      updatedAt: "Live",
+      description: "Fixture-backed spark graph for clients-project acceptance work.",
+      trigger: "Manual ignite",
+    },
+    workflow: {
+      id: graph.id,
+      projectId: graph.id,
+      name: graph.name,
+      nodes,
+      edges,
+      coreGraph: graph,
+    },
+    activity: {
+      status: "idle",
+      progress: 0,
+      activeSparkCount: 0,
+      blockedSparkCount: 0,
+      completedSparkCount: 0,
+      extinguishedSparkCount: 0,
+    },
     sparks: {},
     eventLog: [],
   };
@@ -103,16 +120,18 @@ export function projectFromCoreGraph(graph: CoreGraph): Project {
 
 export function workflowToCoreGraph(project: Project): CoreGraph {
   return {
-    ...project.coreGraph,
-    name: project.name,
-    nodes: project.nodes.map((node) => ({
+    ...project.workflow.coreGraph,
+    name: project.workflow.name,
+    nodes: project.workflow.nodes.map((node) => ({
       id: node.id,
       kind: node.data.connector,
       label: node.data.label,
       position: node.position,
-      config: project.coreGraph.nodes.find((coreNode) => coreNode.id === node.id)?.config ?? {},
+      config:
+        project.workflow.coreGraph.nodes.find((coreNode) => coreNode.id === node.id)
+          ?.config ?? {},
     })),
-    edges: project.edges.map((edge) => ({
+    edges: project.workflow.edges.map((edge) => ({
       id: edge.id,
       source: edge.source,
       sourcePort: edge.sourceHandle ?? "out",

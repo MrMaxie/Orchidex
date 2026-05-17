@@ -16,7 +16,7 @@ export function WorkspaceHeader({
   onToggleRunState: () => void;
   project: Project;
 }) {
-  const status = projectStatusMeta[project.status];
+  const status = projectStatusMeta[project.activity.status];
   const StatusIcon = status.icon;
 
   return (
@@ -33,10 +33,10 @@ export function WorkspaceHeader({
             </Badge>
           </div>
           <h2 className="mt-2 truncate text-xl font-medium text-foreground">
-            {project.name}
+            {project.metadata.name}
           </h2>
           <p className="mt-1 max-w-3xl text-xs/relaxed text-muted-foreground">
-            {project.description}
+            {project.metadata.description}
           </p>
         </div>
 

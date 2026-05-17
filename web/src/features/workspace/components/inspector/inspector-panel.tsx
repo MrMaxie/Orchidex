@@ -7,7 +7,6 @@ import type {
   InspectorTab,
   Project,
   ProjectField,
-  ProjectStatus,
   WorkflowNode,
   WorkflowNodeData,
 } from "@/features/workspace/types";
@@ -17,7 +16,6 @@ export function InspectorPanel({
   inspectorTab,
   onNodeChange,
   onProjectFieldChange,
-  onProjectStatusChange,
   project,
   setInspectorTab,
 }: {
@@ -25,7 +23,6 @@ export function InspectorPanel({
   inspectorTab: InspectorTab;
   onNodeChange: (field: keyof WorkflowNodeData, value: string) => void;
   onProjectFieldChange: (field: ProjectField, value: string) => void;
-  onProjectStatusChange: (status: ProjectStatus) => void;
   project: Project;
   setInspectorTab: (tab: InspectorTab) => void;
 }) {
@@ -47,7 +44,6 @@ export function InspectorPanel({
           <TabsContent className="m-0 p-3" value="project">
             <ProjectInspector
               onFieldChange={onProjectFieldChange}
-              onStatusChange={onProjectStatusChange}
               project={project}
             />
           </TabsContent>

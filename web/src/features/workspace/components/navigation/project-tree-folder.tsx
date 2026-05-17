@@ -75,8 +75,8 @@ export function ProjectTreeFolder({
           {projects.length > 0 ? (
             projects.map((project) => (
               <ProjectTreeFile
-                isActive={project.id === activeProjectId}
-                key={project.id}
+                isActive={project.metadata.id === activeProjectId}
+                key={project.metadata.id}
                 onSelect={onProjectSelect}
                 project={project}
               />

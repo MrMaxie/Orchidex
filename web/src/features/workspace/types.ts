@@ -1,7 +1,12 @@
 import type { Edge, Node } from "@xyflow/react";
-import type { CoreGraph, RuntimeEvent, Spark } from "@/features/workspace/contracts";
+import type {
+  CoreGraph,
+  CoreProjectMetadata,
+  RuntimeEvent,
+  Spark,
+  WorkflowActivitySummary,
+} from "@/features/workspace/contracts";
 
-export type ProjectStatus = "draft" | "idle" | "running" | "blocked";
 export type NodeStatus =
   | "idle"
   | "queued"
@@ -27,19 +32,23 @@ export type WorkflowEdgeData = Record<string, unknown> & {
 };
 export type WorkflowEdge = Edge<WorkflowEdgeData>;
 
-export type Project = {
+export type ProjectMetadata = CoreProjectMetadata;
+
+export type WorkflowGraphData = {
   id: string;
+  projectId: string;
   name: string;
-  groupId: string;
-  status: ProjectStatus;
-  progress: number;
-  owner: string;
-  updatedAt: string;
-  description: string;
-  trigger: string;
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
   coreGraph: CoreGraph;
+};
+
+export type WorkflowActivity = WorkflowActivitySummary;
+
+export type Project = {
+  metadata: ProjectMetadata;
+  workflow: WorkflowGraphData;
+  activity: WorkflowActivity;
   sparks: Record<string, Spark>;
   eventLog: RuntimeEvent[];
 };
@@ -68,4 +77,4 @@ export type CatalogDiagnostic = {
   nodeId?: string | null;
 };
 
-export type ProjectField = "name" | "owner" | "description" | "trigger";
+export type ProjectField = "name" | "cwd" | "owner" | "description" | "trigger";

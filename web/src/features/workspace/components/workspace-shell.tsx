@@ -48,7 +48,6 @@ export function WorkspaceShell({
           inspectorTab={workspace.inspectorTab}
           onNodeChange={workspace.updateSelectedNode}
           onProjectFieldChange={workspace.updateProjectField}
-          onProjectStatusChange={workspace.updateProjectStatus}
           project={workspace.activeProject}
           setInspectorTab={workspace.setInspectorTab}
         />

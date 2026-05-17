@@ -11,6 +11,10 @@ The web workspace SHALL consume runtime events to update graph, spark, node proc
 - **WHEN** a spark movement event arrives
 - **THEN** the workspace updates the spark location and edge transition without a full page refresh
 
+#### Scenario: Workflow has no spark activity
+- **WHEN** the runtime has no active, waiting, blocked, failed, or completed spark events for the selected workflow
+- **THEN** the workspace shows no independent workflow running or stopped state
+
 ### Requirement: Static catalog limitation
 The v1 workspace SHALL replace static mock catalog data with runtime-backed catalog discovery.
 

@@ -46,7 +46,7 @@ export function WorkflowCanvas({
         <ReactFlow
           attributionPosition="bottom-left"
           defaultEdgeOptions={defaultEdgeOptions}
-          edges={project.edges}
+          edges={project.workflow.edges}
           edgesReconnectable
           elementsSelectable
           fitView

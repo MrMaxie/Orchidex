@@ -2,7 +2,7 @@
 
 - [ ] 1.1 Extend TypeScript contracts to mirror v1 Rust runtime commands and events.
 - [x] 1.1.a Add typed node catalog discovery contracts for runtime-backed workspace metadata.
-- [ ] 1.1.b Split project metadata, workflow graph data, project `cwd`, last-opened workflow state, and spark-derived activity in workspace contracts.
+- [x] 1.1.b Split project metadata, workflow graph data, project `cwd`, last-opened workflow state, and spark-derived activity in workspace contracts.
 - [x] 1.1.c Extend graph edge contracts and TypeScript edge mapping with source/target port handles while preserving non-rendered routing metadata.
 - [ ] 1.2 Add HTTP strategy support for node catalog, queue/manual controls, run history, and v1 runtime events.
 - [x] 1.2.a Add HTTP node catalog fetching alongside existing graph and spark operations.

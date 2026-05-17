@@ -38,7 +38,7 @@ export function ProjectTree({
               group={group}
               key={group.id}
               onProjectSelect={onProjectSelect}
-              projects={projects.filter((project) => project.groupId === group.id)}
+              projects={projects.filter((project) => project.metadata.groupId === group.id)}
             />
           ))}
         </nav>

@@ -18,7 +18,7 @@ export function ProjectTreeFile({
   onSelect: (projectId: string) => void;
   project: Project;
 }) {
-  const status = projectStatusMeta[project.status];
+  const status = projectStatusMeta[project.activity.status];
   const StatusIcon = status.icon;
 
   return (
@@ -30,7 +30,7 @@ export function ProjectTreeFile({
         "focus-visible:ring-2 focus-visible:ring-ring/40",
         isActive && "bg-muted text-foreground",
       )}
-      onClick={() => onSelect(project.id)}
+      onClick={() => onSelect(project.metadata.id)}
       type="button"
     >
       <IconFileCode
@@ -39,9 +39,9 @@ export function ProjectTreeFile({
         size={15}
         stroke={1.7}
       />
-      <span className="min-w-0 flex-1 truncate">{project.name}</span>
+      <span className="min-w-0 flex-1 truncate">{project.metadata.name}</span>
       <span className="hidden shrink-0 font-mono text-[0.625rem] text-muted-foreground group-hover:inline">
-        {project.nodes.length}
+        {project.workflow.nodes.length}
       </span>
       <Tooltip>
         <TooltipTrigger asChild>
@@ -53,7 +53,7 @@ export function ProjectTreeFile({
           />
         </TooltipTrigger>
         <TooltipContent side="right">
-          {status.label} · {project.updatedAt}
+          {status.label} · {project.metadata.updatedAt}
         </TooltipContent>
       </Tooltip>
     </button>

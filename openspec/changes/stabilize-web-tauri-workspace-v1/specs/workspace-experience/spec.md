@@ -14,6 +14,17 @@ The workspace SHALL show active spark locations, edge transitions, node process 
 - **WHEN** the runtime emits a spark movement event
 - **THEN** the workspace visually updates the spark location and edge transition without requiring a full page refresh
 
+### Requirement: Workflow activity comes from sparks
+The workspace SHALL treat a workflow as an editable graph surface and SHALL derive visible workflow activity only from active, waiting, blocked, failed, completed, or extinguished sparks reported by the runtime.
+
+#### Scenario: User opens an idle workflow
+- **WHEN** the selected workflow has no active or waiting sparks
+- **THEN** the workspace shows the workflow as an editable graph without workflow-level running, stopped, start, or stop state
+
+#### Scenario: Spark activity changes
+- **WHEN** runtime events report spark ignition, movement, waiting, blocking, completion, or extinguishing
+- **THEN** the workspace updates workflow activity indicators from those spark states instead of mutating a workflow-owned status field
+
 ### Requirement: Live graph editing
 The workspace SHALL allow graph edits while sparks are active and SHALL surface runtime reconciliation results for affected sparks.
 
@@ -27,3 +38,24 @@ The workspace SHALL provide controls for manual spark ignition, manual acceptanc
 #### Scenario: User releases a queued spark
 - **WHEN** a queued spark is released through the workspace
 - **THEN** the runtime resumes that spark and the workspace updates from the emitted events
+
+### Requirement: Canvas-first workspace layout
+The workspace SHALL render the central column as the primary ReactFlow canvas surface and SHALL avoid nested panels inside that central canvas area.
+
+#### Scenario: User views a workflow
+- **WHEN** a workflow is selected
+- **THEN** the middle workspace area is occupied by the flow canvas, with add-node, mode, zoom, fit-view, and selection controls available as compact hover or overlay controls
+
+### Requirement: Theme-readable visual controls
+ReactFlow controls, selected states, status indicators, and canvas overlays SHALL use the workspace design tokens so functional controls remain readable and the workspace does not collapse to a black-and-white visual treatment.
+
+#### Scenario: User opens canvas controls
+- **WHEN** zoom, fit-view, minimap, selection, or status controls are visible
+- **THEN** icons, backgrounds, borders, and active states have sufficient theme contrast and use the configured status and workflow color tokens
+
+### Requirement: Compact minimap
+The workspace minimap SHALL remain available but SHALL render at roughly half the current visual footprint so it does not dominate the canvas.
+
+#### Scenario: User opens a workflow with the minimap enabled
+- **WHEN** the canvas renders its minimap
+- **THEN** the minimap occupies a compact corner footprint while staying pannable or zoomable where supported
