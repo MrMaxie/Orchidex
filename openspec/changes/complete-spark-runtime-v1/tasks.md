@@ -1,0 +1,17 @@
+## 1. Runtime State And Contracts
+
+- [ ] 1.1 Define the v1 spark state machine and node execution outcome model in Rust.
+- [ ] 1.2 Add local file-backed storage for graphs, active sparks, run history, queues, diagnostics, and replay metadata.
+- [ ] 1.3 Extend runtime commands and events for waiting, blocking, failure, completion, queue release, manual resolution, and run history inspection.
+
+## 2. Execution Engine
+
+- [ ] 2.1 Wire node registry and Rhai execution into spark advancement.
+- [ ] 2.2 Support concurrent sparks with deterministic per-spark traces and extinguish-all cancellation.
+- [ ] 2.3 Reconcile live graph edits against active sparks and blocked routes.
+
+## 3. Validation
+
+- [ ] 3.1 Add Rust tests for concurrent sparks, extinguish-all, live edits, failure states, waiting states, and persistence replay.
+- [ ] 3.2 Update fixture scenario coverage for the v1 runtime path.
+- [ ] 3.3 Run `cargo test --workspace`, `bun run check`, `bun run build:web`, and `bun run core -- run-scenario`.
