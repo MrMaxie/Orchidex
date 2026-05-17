@@ -123,6 +123,31 @@ export type RuntimeEvent =
   | { type: "allSparksExtinguished" }
   | { type: "log"; nodeId: string; message: string };
 
+export type RunHistoryEntry = {
+  sparkId: string;
+  graphId: string;
+  finalStatus: SparkStatus;
+  lastNodeId: string;
+  reason?: string | null;
+};
+
+export type RuntimeDiagnostic = {
+  kind: string;
+  message: string;
+  graphId: string;
+  sparkId?: string | null;
+  nodeId?: string | null;
+  context: Record<string, JsonValue>;
+};
+
+export type SparkTraceStep = {
+  sparkId: string;
+  nodeId: string;
+  event: string;
+  edgeId?: string | null;
+  reason?: string | null;
+};
+
 export type CoreNodeStatus =
   | "idle"
   | "queued"

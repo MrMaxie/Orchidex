@@ -1,4 +1,7 @@
-use crate::models::{Graph, IgniteSparkRequest, NodeCatalogResponse, RuntimeEvent};
+use crate::models::{
+    Graph, IgniteSparkRequest, NodeCatalogResponse, RunHistoryEntry, RuntimeDiagnostic,
+    RuntimeEvent, SparkTraceStep,
+};
 use crate::runtime::RuntimeHandle;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -18,6 +21,9 @@ pub fn router(runtime: RuntimeHandle) -> Router {
         .route("/nodes", get(get_node_catalog))
         .route("/sparks", post(ignite_spark))
         .route("/sparks/extinguish", post(extinguish_sparks))
+        .route("/runtime/history", get(get_run_history))
+        .route("/runtime/diagnostics", get(get_diagnostics))
+        .route("/runtime/traces", get(get_traces))
         .route("/events", get(events))
         .layer(CorsLayer::permissive())
         .with_state(runtime)
@@ -59,6 +65,24 @@ async fn ignite_spark(
 
 async fn extinguish_sparks(State(runtime): State<RuntimeHandle>) -> Result<Json<usize>, ApiError> {
     Ok(Json(runtime.extinguish_all()?))
+}
+
+async fn get_run_history(
+    State(runtime): State<RuntimeHandle>,
+) -> Result<Json<Vec<RunHistoryEntry>>, ApiError> {
+    Ok(Json(runtime.run_history()?))
+}
+
+async fn get_diagnostics(
+    State(runtime): State<RuntimeHandle>,
+) -> Result<Json<Vec<RuntimeDiagnostic>>, ApiError> {
+    Ok(Json(runtime.diagnostics()?))
+}
+
+async fn get_traces(
+    State(runtime): State<RuntimeHandle>,
+) -> Result<Json<Vec<SparkTraceStep>>, ApiError> {
+    Ok(Json(runtime.traces()?))
 }
 
 async fn events(

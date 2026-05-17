@@ -1,4 +1,4 @@
-use orchidex_core::{NodeRegistry, RuntimeHandle};
+use orchidex_core::{default_graph, NodeRegistry, RuntimeHandle};
 use std::path::PathBuf;
 
 #[test]
@@ -15,13 +15,13 @@ fn loads_standard_node_catalog() {
 
 #[tokio::test]
 async fn extinguish_on_empty_runtime_is_safe() {
-    let runtime = RuntimeHandle::demo();
+    let runtime = RuntimeHandle::ephemeral(default_graph());
     assert_eq!(runtime.extinguish_all().expect("extinguish should work"), 0);
 }
 
 #[test]
 fn runtime_exposes_node_catalog_for_workspace_transports() {
-    let runtime = RuntimeHandle::demo();
+    let runtime = RuntimeHandle::ephemeral(default_graph());
     let catalog = runtime.node_catalog();
 
     assert!(catalog

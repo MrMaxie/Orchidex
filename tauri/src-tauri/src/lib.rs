@@ -1,4 +1,7 @@
-use orchidex_core::{Graph, IgniteSparkRequest, NodeCatalogResponse, RuntimeHandle, Spark};
+use orchidex_core::{
+    Graph, IgniteSparkRequest, NodeCatalogResponse, RunHistoryEntry, RuntimeDiagnostic,
+    RuntimeHandle, Spark, SparkTraceStep,
+};
 use tauri::{Emitter, State};
 
 #[tauri::command]
@@ -31,6 +34,23 @@ fn extinguish_sparks(runtime: State<'_, RuntimeHandle>) -> Result<usize, String>
     runtime.extinguish_all().map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn get_run_history(runtime: State<'_, RuntimeHandle>) -> Result<Vec<RunHistoryEntry>, String> {
+    runtime.run_history().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn get_runtime_diagnostics(
+    runtime: State<'_, RuntimeHandle>,
+) -> Result<Vec<RuntimeDiagnostic>, String> {
+    runtime.diagnostics().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn get_runtime_traces(runtime: State<'_, RuntimeHandle>) -> Result<Vec<SparkTraceStep>, String> {
+    runtime.traces().map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let runtime = RuntimeHandle::demo();
@@ -52,7 +72,10 @@ pub fn run() {
             get_node_catalog,
             replace_graph,
             ignite_spark,
-            extinguish_sparks
+            extinguish_sparks,
+            get_run_history,
+            get_runtime_diagnostics,
+            get_runtime_traces
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

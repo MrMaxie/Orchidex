@@ -110,6 +110,55 @@ pub struct Spark {
     pub status: SparkStatus,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SparkTraceStep {
+    pub spark_id: String,
+    pub node_id: String,
+    pub event: String,
+    #[serde(default)]
+    pub edge_id: Option<String>,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeDiagnostic {
+    pub kind: String,
+    pub message: String,
+    pub graph_id: String,
+    #[serde(default)]
+    pub spark_id: Option<String>,
+    #[serde(default)]
+    pub node_id: Option<String>,
+    #[serde(default)]
+    pub context: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RunHistoryEntry {
+    pub spark_id: String,
+    pub graph_id: String,
+    pub final_status: SparkStatus,
+    pub last_node_id: String,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeSnapshot {
+    pub graph: Graph,
+    pub active_sparks: Vec<Spark>,
+    pub run_history: Vec<RunHistoryEntry>,
+    pub diagnostics: Vec<RuntimeDiagnostic>,
+    pub traces: Vec<SparkTraceStep>,
+    pub cache_entries: BTreeMap<String, Value>,
+    pub freezer_entries: BTreeMap<String, Value>,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IgniteSparkRequest {

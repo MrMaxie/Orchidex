@@ -21,6 +21,7 @@ dist-ssr
 tauri/src-tauri/target
 .playwright-mcp
 *.local
+.orchidex
 
 # Editor directories and files
 .vscode/*
