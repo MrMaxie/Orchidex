@@ -6,9 +6,10 @@ import type {
   WorkflowGraphData,
   WorkflowNode,
 } from "@/features/workspace/types";
+import { defaultProjectCwd } from "@/features/workspace/config/workspace-defaults";
 
 export const fallbackNodeCatalog: CatalogNode[] = [
-  node("std/manual-ignite", "Manual Ignite", "Std", "Input", "Starts a spark from user-provided form data."),
+  node("std/manual-ignite", "Manual Ignitor", "Std", "Input", "Starts work from user-provided form data."),
   node("std/transmute", "Transmute", "Std", "Rhai", "Transforms payloads with Rhai."),
   node("std/accumulation", "Accumulation", "Std", "Queue", "Queues sparks and releases them by policy."),
   node("std/filter", "Filter", "Std", "Rules", "Filters sparks by payload data."),
@@ -20,7 +21,7 @@ export const fallbackNodeCatalog: CatalogNode[] = [
   node("debug/placeholder-echo", "Placeholder Echo", "Debug", "Echo", "Emits the same payload it receives."),
   node("debug/placeholder-rhai", "Placeholder Rhai", "Debug", "Rhai", "Emits a changed payload."),
   node("debug/note", "Note", "Debug", "Note", "Stores a visual note without execution ports."),
-  node("std/cron", "Cron", "Std", "Schedule", "Ignites work on a schedule."),
+  node("std/cron", "Cron", "Std", "Schedule", "Starts work on a schedule."),
   node("std/freezer", "Freezer", "Std", "Memory", "Freezes an output permanently."),
   node("std/cache", "Cache", "Std", "Cache", "Skips repeated input/output mappings."),
 ];
@@ -32,7 +33,7 @@ const clientsProjectGraph: CoreGraph = {
     {
       id: "manual-start",
       kind: "std/manual-ignite",
-      label: "Manual intake",
+      label: "Manual ignitor",
       position: { x: 0, y: 120 },
       config: {},
     },
@@ -81,11 +82,11 @@ export function projectFromCoreGraph(graph: CoreGraph): Project {
       id: graph.id,
       name: graph.name,
       groupId: "automation",
-      cwd: ".",
+      cwd: defaultProjectCwd,
       owner: "Core",
       updatedAt: "Live",
       description: "Fixture-backed spark graph for clients-project acceptance work.",
-      trigger: "Manual ignite",
+      trigger: "Manual ignitor",
     },
     workflows: [workflowFromCoreGraph(graph, graph.id)],
     activity: {

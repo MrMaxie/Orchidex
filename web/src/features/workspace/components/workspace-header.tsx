@@ -1,5 +1,3 @@
-import { IconCopy } from "@tabler/icons-react";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { projectStatusMeta } from "@/features/workspace/config/status-meta";
@@ -7,14 +5,10 @@ import type { Project, WorkflowGraphData } from "@/features/workspace/types";
 
 export function WorkspaceHeader({
   activeWorkflow,
-  isRunning,
-  onDuplicateWorkflow,
   onToggleRunState,
   project,
 }: {
   activeWorkflow: WorkflowGraphData | null;
-  isRunning: boolean;
-  onDuplicateWorkflow: () => void;
   onToggleRunState: () => void;
   project: Project | null;
 }) {
@@ -29,9 +23,6 @@ export function WorkspaceHeader({
             <Badge variant={status.badgeVariant}>
               <StatusIcon data-icon="inline-start" stroke={1.7} />
               {status.label}
-            </Badge>
-            <Badge variant="outline">
-              {isRunning ? "Preview mode" : "Editor mode"}
             </Badge>
           </div>
           <h2 className="mt-2 truncate text-xl font-medium text-foreground">
@@ -52,15 +43,6 @@ export function WorkspaceHeader({
             variant="outline"
           >
             {status.action}
-          </Button>
-          <Button
-            disabled={!activeWorkflow}
-            onClick={onDuplicateWorkflow}
-            type="button"
-            variant="outline"
-          >
-            <IconCopy data-icon="inline-start" stroke={1.7} />
-            Duplicate workflow
           </Button>
         </div>
       </div>

@@ -7,6 +7,7 @@ import { WorkflowCanvas } from "@/features/workspace/components/workflow-canvas"
 import { WorkspaceHeader } from "@/features/workspace/components/workspace-header";
 import type { ConnectionStrategy } from "@/features/workspace/contracts";
 import { useWorkspaceState } from "@/features/workspace/hooks/use-workspace-state";
+import { cn } from "@/lib/utils";
 import { useState } from "react";
 
 export function WorkspaceShell({
@@ -33,33 +34,39 @@ export function WorkspaceShell({
             setCreateDialog({ mode: "workflow", projectId })
           }
           onDashboardSelect={workspace.selectDashboard}
+          onDuplicateWorkflow={workspace.duplicateWorkflow}
           onProjectSelect={workspace.selectProject}
           onWorkflowSelect={workspace.selectWorkflow}
           projects={workspace.projects}
           selectedProjectId={workspace.selectedProjectId}
         />
 
-        <section className="grid min-h-0 grid-rows-[auto_1fr] overflow-hidden">
-          <WorkspaceHeader
-            activeWorkflow={workspace.activeWorkflow}
-            isRunning={workspace.isRunning}
-            onDuplicateWorkflow={workspace.duplicateWorkflow}
-            onToggleRunState={workspace.toggleRunState}
-            project={workspace.activeProject}
-          />
+        <section
+          className={cn(
+            "grid min-h-0 overflow-hidden",
+            workspace.activeWorkflow ? "grid-rows-[auto_1fr]" : "grid-rows-[1fr]",
+          )}
+        >
           {workspace.activeWorkflow ? (
-            <WorkflowCanvas
-              isRunning={workspace.isRunning}
-              onConnect={workspace.onConnect}
-              onEdgesChange={workspace.onEdgesChange}
-              onNodesChange={workspace.onNodesChange}
-              onOpenCatalog={() => workspace.setCatalogOpen(true)}
-              onSelectNode={() => workspace.setInspectorTab("node")}
-              onSelectionClear={() => workspace.setSelectedNodeId(null)}
-              setSelectedNodeId={workspace.setSelectedNodeId}
-              visibleNodes={workspace.visibleNodes}
-              workflow={workspace.activeWorkflow}
-            />
+            <>
+              <WorkspaceHeader
+                activeWorkflow={workspace.activeWorkflow}
+                onToggleRunState={workspace.toggleRunState}
+                project={workspace.activeProject}
+              />
+              <WorkflowCanvas
+                isRunning={workspace.isRunning}
+                onConnect={workspace.onConnect}
+                onEdgesChange={workspace.onEdgesChange}
+                onNodesChange={workspace.onNodesChange}
+                onOpenCatalog={() => workspace.setCatalogOpen(true)}
+                onSelectNode={() => workspace.setInspectorTab("node")}
+                onSelectionClear={() => workspace.setSelectedNodeId(null)}
+                setSelectedNodeId={workspace.setSelectedNodeId}
+                visibleNodes={workspace.visibleNodes}
+                workflow={workspace.activeWorkflow}
+              />
+            </>
           ) : (
             <DashboardView
               onCreateProject={() =>

@@ -5,10 +5,14 @@ import { fileURLToPath, URL } from "node:url";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
+const workspaceRoot = fileURLToPath(new URL("..", import.meta.url));
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [tailwindcss(), react()],
+  define: {
+    __ORCHIDEX_WORKSPACE_ROOT__: JSON.stringify(workspaceRoot),
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

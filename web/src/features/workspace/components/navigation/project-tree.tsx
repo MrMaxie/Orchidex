@@ -13,6 +13,7 @@ export function ProjectTree({
   onCreateProject,
   onCreateWorkflow,
   onDashboardSelect,
+  onDuplicateWorkflow,
   onProjectSelect,
   onWorkflowSelect,
   projects,
@@ -23,6 +24,7 @@ export function ProjectTree({
   onCreateProject: () => void;
   onCreateWorkflow: (projectId: string) => void;
   onDashboardSelect: () => void;
+  onDuplicateWorkflow: (workflowId: string) => void;
   onProjectSelect: (projectId: string) => void;
   onWorkflowSelect: (workflowId: string) => void;
   projects: Project[];
@@ -67,7 +69,7 @@ export function ProjectTree({
             <IconDashboard aria-hidden className="shrink-0" size={15} stroke={1.7} />
             <span className="min-w-0 flex-1 truncate">Dashboard</span>
           </button>
-          <div className="flex flex-col gap-px pl-4">
+          <div className="flex flex-col gap-px">
             {projects.length > 0 ? (
               projects.map((project) => (
                 <ProjectTreeFile
@@ -75,6 +77,7 @@ export function ProjectTree({
                   isActive={project.metadata.id === selectedProjectId}
                   key={project.metadata.id}
                   onCreateWorkflow={onCreateWorkflow}
+                  onDuplicateWorkflow={onDuplicateWorkflow}
                   onProjectSelect={onProjectSelect}
                   onWorkflowSelect={onWorkflowSelect}
                   project={project}

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { defaultProjectCwd } from "@/features/workspace/config/workspace-defaults";
 
 type CreateDialogMode = "project" | "workflow";
 
@@ -30,14 +31,14 @@ export function WorkspaceCreateDialog({
   projectId: string | null;
 }) {
   const [name, setName] = useState("");
-  const [cwd, setCwd] = useState(".");
+  const [cwd, setCwd] = useState(defaultProjectCwd);
   const isProject = mode === "project";
   const canSubmit = name.trim().length > 0 && (isProject || Boolean(projectId));
 
   useEffect(() => {
     if (!open) {
       setName("");
-      setCwd(".");
+      setCwd(defaultProjectCwd);
     }
   }, [open]);
 
@@ -59,7 +60,7 @@ export function WorkspaceCreateDialog({
             }
 
             if (isProject) {
-              onCreateProject(name.trim(), cwd.trim() || ".");
+              onCreateProject(name.trim(), cwd.trim() || defaultProjectCwd);
             } else if (projectId) {
               onCreateWorkflow(projectId, name.trim());
             }

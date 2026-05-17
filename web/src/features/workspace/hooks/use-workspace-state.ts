@@ -329,23 +329,29 @@ export function useWorkspaceState(connection: ConnectionStrategy | null) {
     selectWorkflowAfterMutation(projectId, workflow.id);
   };
 
-  const duplicateWorkflow = () => {
-    if (!activeProject || !activeWorkflow) {
+  const duplicateWorkflow = (workflowId = activeWorkflow?.id) => {
+    if (!workflowId) {
       return;
     }
 
-    const workflowId = makeStableId("workflow", `${activeWorkflow.name} copy`);
+    const sourceProject = findProjectForWorkflow(projects, workflowId);
+    const sourceWorkflow = findWorkflow(projects, workflowId);
+    if (!sourceProject || !sourceWorkflow) {
+      return;
+    }
+
+    const nextWorkflowId = makeStableId("workflow", `${sourceWorkflow.name} copy`);
     const workflow = duplicateWorkflowGraph(
-      activeWorkflow,
-      workflowId,
-      `${activeWorkflow.name} copy`,
+      sourceWorkflow,
+      nextWorkflowId,
+      `${sourceWorkflow.name} copy`,
     );
 
-    updateProjectById(activeProject.metadata.id, (project) => ({
+    updateProjectById(sourceProject.metadata.id, (project) => ({
       ...project,
       workflows: [...project.workflows, workflow],
     }));
-    selectWorkflowAfterMutation(activeProject.metadata.id, workflow.id);
+    selectWorkflowAfterMutation(sourceProject.metadata.id, workflow.id);
   };
 
   const selectWorkflowAfterMutation = (projectId: string, workflowId: string) => {

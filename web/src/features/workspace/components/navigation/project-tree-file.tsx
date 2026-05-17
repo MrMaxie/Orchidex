@@ -1,4 +1,5 @@
 import {
+  IconCopy,
   IconFileCode,
   IconFolder,
   IconPlus,
@@ -18,6 +19,7 @@ export function ProjectTreeFile({
   activeWorkflowId,
   isActive,
   onCreateWorkflow,
+  onDuplicateWorkflow,
   onProjectSelect,
   onWorkflowSelect,
   project,
@@ -25,6 +27,7 @@ export function ProjectTreeFile({
   activeWorkflowId: string | null;
   isActive: boolean;
   onCreateWorkflow: (projectId: string) => void;
+  onDuplicateWorkflow: (workflowId: string) => void;
   onProjectSelect: (projectId: string) => void;
   onWorkflowSelect: (workflowId: string) => void;
   project: Project;
@@ -72,29 +75,45 @@ export function ProjectTreeFile({
 
       <div className="flex flex-col gap-px pl-4">
         {project.workflows.map((workflow) => (
-          <button
-            aria-current={workflow.id === activeWorkflowId ? "page" : undefined}
-            className={cn(
-              "group flex h-7 w-full items-center gap-1.5 rounded-sm px-2 text-left text-xs outline-none",
-              "text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-              "focus-visible:ring-2 focus-visible:ring-ring/40",
-              workflow.id === activeWorkflowId && "bg-muted text-foreground",
-            )}
-            key={workflow.id}
-            onClick={() => onWorkflowSelect(workflow.id)}
-            type="button"
-          >
-            <IconFileCode
-              aria-hidden
-              className="shrink-0 text-muted-foreground group-hover:text-foreground"
-              size={15}
-              stroke={1.7}
-            />
-            <span className="min-w-0 flex-1 truncate">{workflow.name}</span>
-            <span className="hidden shrink-0 font-mono text-[0.625rem] text-muted-foreground group-hover:inline">
-              {workflow.nodes.length}
-            </span>
-          </button>
+          <div className="group/workflow flex items-center gap-1" key={workflow.id}>
+            <button
+              aria-current={workflow.id === activeWorkflowId ? "page" : undefined}
+              className={cn(
+                "group flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-sm px-2 text-left text-xs outline-none",
+                "text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                "focus-visible:ring-2 focus-visible:ring-ring/40",
+                workflow.id === activeWorkflowId && "bg-muted text-foreground",
+              )}
+              onClick={() => onWorkflowSelect(workflow.id)}
+              type="button"
+            >
+              <IconFileCode
+                aria-hidden
+                className="shrink-0 text-muted-foreground group-hover:text-foreground"
+                size={15}
+                stroke={1.7}
+              />
+              <span className="min-w-0 flex-1 truncate">{workflow.name}</span>
+              <span className="hidden shrink-0 font-mono text-[0.625rem] text-muted-foreground group-hover:inline">
+                {workflow.nodes.length}
+              </span>
+            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  aria-label={`Duplicate ${workflow.name}`}
+                  className="opacity-0 transition-opacity group-hover/workflow:opacity-100 focus-visible:opacity-100"
+                  onClick={() => onDuplicateWorkflow(workflow.id)}
+                  size="icon-xs"
+                  type="button"
+                  variant="ghost"
+                >
+                  <IconCopy aria-hidden stroke={1.7} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Duplicate workflow</TooltipContent>
+            </Tooltip>
+          </div>
         ))}
         <Button
           className="justify-start"

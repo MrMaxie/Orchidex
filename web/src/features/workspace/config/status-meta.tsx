@@ -27,14 +27,14 @@ export type StatusMeta = {
 export const projectStatusMeta: Record<WorkflowActivityStatus, StatusMeta> = {
   draft: {
     label: "Draft",
-    action: "Ignite spark",
+    action: "Run workflow",
     icon: IconCircleDashed,
     className: "text-[color:var(--workflow-status-draft)]",
     badgeVariant: "outline",
   },
   idle: {
     label: "Ready",
-    action: "Ignite spark",
+    action: "Run workflow",
     icon: IconCircleCheck,
     className: "text-[color:var(--workflow-status-idle)]",
     badgeVariant: "secondary",
@@ -48,7 +48,7 @@ export const projectStatusMeta: Record<WorkflowActivityStatus, StatusMeta> = {
   },
   blocked: {
     label: "Blocked",
-    action: "Ignite spark",
+    action: "Run workflow",
     icon: IconAlertCircle,
     className: "text-[color:var(--workflow-status-blocked)]",
     badgeVariant: "destructive",

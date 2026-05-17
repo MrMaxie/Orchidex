@@ -15,6 +15,7 @@ describe("project tree navigation", () => {
           onCreateProject={() => undefined}
           onCreateWorkflow={() => undefined}
           onDashboardSelect={() => undefined}
+          onDuplicateWorkflow={() => undefined}
           onProjectSelect={() => undefined}
           onWorkflowSelect={() => undefined}
           projects={initialProjects}

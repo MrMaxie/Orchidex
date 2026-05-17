@@ -99,9 +99,9 @@ export function WorkflowCanvas({
             style={{ height: 96, width: 144 }}
             zoomable
           />
-          <Controls className="!border-border !bg-popover !text-foreground" />
-          <Panel position="top-left">
-            <div className="flex items-center gap-2 rounded-md border border-border bg-popover/95 p-1 shadow-lg">
+          <Controls className="!border !border-border !bg-popover !text-foreground [&_button]:!border-border [&_button]:!bg-popover [&_button]:!text-foreground [&_button:hover]:!bg-muted [&_svg]:!fill-current" />
+          <Panel className="!m-3" position="top-left">
+            <div className="flex h-8 items-center gap-1 rounded-md border border-border bg-popover/95 p-1 shadow-lg shadow-black/25">
               <Badge variant={isRunning ? "default" : "outline"}>
                 {isRunning ? "Live sparks" : "Editable graph"}
               </Badge>
@@ -150,6 +150,7 @@ function CanvasIconButton({
       <TooltipTrigger asChild>
         <Button
           aria-label={label}
+          className="border-transparent bg-transparent"
           onClick={onClick}
           size="icon-sm"
           type="button"

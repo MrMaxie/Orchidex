@@ -45,6 +45,17 @@
 - Keep outward-facing project files, code, comments, and commit messages in English unless the user asks otherwise.
 - Use conventional commits in English with `fix:`, `feat:`, or `chore:` and no scope.
 
+## Workspace UI map
+
+- Dashboard is not a workflow. In `web/src/features/workspace/components/workspace-shell.tsx`, render workflow headers and workflow actions only when `activeWorkflow` exists.
+- Explorer ownership is split: `navigation/project-tree.tsx` owns the Dashboard/project level, while `navigation/project-tree-file.tsx` owns workflows and per-workflow row actions such as duplicate.
+- Workflow duplication should accept a `workflowId` so tree actions duplicate the targeted workflow, not only the currently active workflow.
+- Project `cwd` defaults and fixture metadata must stay absolute; do not fall back to `"."` for visible project paths.
+- Node `app` and `connector` are runtime identity fields. The node inspector may display them, but should not expose them as editable user inputs.
+- Default visible workspace labels and action text often come from `data/mock-projects.ts` and `config/status-meta.tsx`, not only from rendered components.
+- ReactFlow canvas controls in `workflow-canvas.tsx` require styling through ReactFlow `Panel`, `Controls`, and nested control selectors because the library owns part of the DOM.
+- When validating only the web app without `core:serve`, `127.0.0.1:3869` connection failures are expected and should not be treated as UI regressions.
+
 ## Node authoring
 
 - Use `.agents/skills/orchidex-node-authoring/` when creating or updating Orchidex node folders.

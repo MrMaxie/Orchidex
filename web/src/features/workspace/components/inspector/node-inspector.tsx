@@ -84,29 +84,19 @@ export function NodeInspector({
         </p>
         <FieldGroup>
           <Field>
+            <FieldLabel>Node type</FieldLabel>
+            <div className="rounded-md border border-border bg-muted/20 px-2 py-1.5 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{node.data.app}</span>
+              <span className="px-1.5">·</span>
+              <span className="font-mono">{node.data.connector}</span>
+            </div>
+          </Field>
+          <Field>
             <FieldLabel htmlFor="node-label">Label</FieldLabel>
             <Input
               id="node-label"
               onChange={(event) => onNodeChange("label", event.currentTarget.value)}
               value={node.data.label}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="node-app">App</FieldLabel>
-            <Input
-              id="node-app"
-              onChange={(event) => onNodeChange("app", event.currentTarget.value)}
-              value={node.data.app}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="node-connector">Connector</FieldLabel>
-            <Input
-              id="node-connector"
-              onChange={(event) =>
-                onNodeChange("connector", event.currentTarget.value)
-              }
-              value={node.data.connector}
             />
           </Field>
           <Field>

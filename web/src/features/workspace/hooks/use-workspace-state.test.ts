@@ -43,6 +43,13 @@ describe("workspace graph model", () => {
     expect(project.workflows).toEqual([]);
   });
 
+  test("ships the fixture project with an absolute cwd", () => {
+    const cwd = initialProjects[0]?.metadata.cwd ?? "";
+
+    expect(cwd).not.toBe(".");
+    expect(cwd).toMatch(/^(?:[A-Za-z]:[\\/]|\/)/);
+  });
+
   test("creates empty workflows owned by a project", () => {
     const workflow = createEmptyWorkflow("project-ui", "workflow-ui", "UI Workflow");
 
