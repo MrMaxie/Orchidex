@@ -11,7 +11,7 @@
 - `src/`: React app, Tailwind CSS entrypoint, and ReactFlow UI.
 - `src-tauri/`: Tauri v2 app configuration, Rust commands, and desktop build metadata.
 - `public/`: static assets served by Vite.
-- `.agents/`: local skill cache; ignored and not part of the project source.
+- `.agents/skills/`: repo-local skill installs available to the agent for this workspace; treat them as tooling, not product source.
 
 ## Workflow
 
@@ -33,13 +33,22 @@
 
 ## Skill routing
 
+Repo-local skills are installed under `.agents/skills/` and should be considered alongside globally available skills when they match the task.
+
 | Task signal | Use skill | Notes |
 | --- | --- | --- |
-| Tauri app setup, desktop shell, cross-platform behavior | `$tauri-development` | Use for app lifecycle, build, and Tauri integration decisions. |
-| Rust backend commands, filesystem, IPC, permissions | `$rust-tauri-backend` | Use for non-trivial Rust/Tauri backend changes. |
-| Rust-to-frontend events or frontend calls from Rust | `$calling-frontend-from-tauri-rust` | Use when wiring Tauri events, emit calls, or JS evaluation. |
-| ReactFlow canvases, DAGs, custom nodes, graph state | `$reactflow-expert` or `$react-flow-architect` | Use for graph visualization and node editor behavior. |
-| Tailwind tokens, UI systems, reusable styling patterns | `$tailwind-design-system` | Use for Tailwind v4 design system work. |
+| Tauri app setup, desktop shell, cross-platform behavior | `$tauri-development` or `$tauri-desktop` | Prefer `$tauri-development` for general implementation guidance; use `$tauri-desktop` for broader Tauri platform, plugin, packaging, or security-model decisions. |
+| Rust backend commands, filesystem, IPC, permissions | `$rust-tauri-backend` | Use for non-trivial Rust/Tauri backend changes in `src-tauri/`. |
+| Rust-to-frontend events or frontend calls from Rust | `$calling-frontend-from-tauri-rust` | Use when wiring Tauri events, emit calls, channels, or JS evaluation. |
+| ReactFlow canvases, DAGs, custom nodes, graph state | `$reactflow-expert` or `$react-flow-architect` | Prefer `$reactflow-expert` for DAG/custom-node/ELK/live-update work; use `$react-flow-architect` for architecture, hierarchy, and state design. |
+| Tailwind v4 setup, utility-vs-CSS choices, style drift | `$busirocket-tailwindcss-v4` or `$tailwind-design-system` | Prefer the local Tailwind v4 skill for implementation details in this repo; use `$tailwind-design-system` for broader token/system work. |
+| Shadcn component setup or registry-driven UI work | `$shadcn` | Use when adding or debugging shadcn/ui components or `components.json`-driven workflows. |
+| MCP server or tool/resource/prompt integration work | `$mcp-protocol-builder` | Use when Orchidex work expands into MCP tooling or AI-native integrations. |
+| OpenAI Codex issue triage | `$codex-bug` | Use only for diagnosing issues from `openai/codex` GitHub issue URLs. |
+| Long autonomous modify-verify loops | `$codex-autoresearch-loop` | Use when the user explicitly wants unattended iterative improvement toward a measurable goal. |
+| Multi-agent Codex/Claude/Cursor orchestration | `$codex-claude-loop` or `$codex-claude-cursor-loop` | Use only when the user explicitly wants that cross-agent workflow. |
+| Parallel Codex review escalation loop | `$loop-codex-review` | Use when the user explicitly asks for repeated review rounds until a clean result. |
+| Codex exec fan-out in worktrees | `$codex-skill` or `$run-codex-exec` | Use for explicit Codex exec delegation; treat `$run-codex-exec` as the compatibility path for the old name. |
 | Agent instructions | `$agents-md-maintainer` | Use when creating or updating `AGENTS.md` or `.local/AGENTS.md`. |
 
 ## Done means

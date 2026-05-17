@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "busirocket-tailwindcss-v4": {
+      "source": "busirocket/agents-skills",
+      "sourceType": "github",
+      "skillPath": "skills/busirocket-tailwindcss-v4/SKILL.md",
+      "computedHash": "6535f33684606162441164693edbddf20a5ffd8176290df6b0fed5adf90b1122"
+    },
     "calling-frontend-from-tauri-rust": {
       "source": "dchuk/claude-code-tauri-skills",
       "sourceType": "github",
@@ -72,6 +78,18 @@
       "sourceType": "github",
       "skillPath": ".claude/skills/rust-tauri-backend/SKILL.md",
       "computedHash": "3ec9d9c099d47d7698800d275054b2ebd273c337a36309a638d54eb870113218"
+    },
+    "shadcn": {
+      "source": "shadcn/ui",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "f0fdd03f4755cbb3b57e20fe6fd4a97c00d34e6780187b6559316986e8d848db"
+    },
+    "tauri-desktop": {
+      "source": "travisjneuman/.claude",
+      "sourceType": "github",
+      "skillPath": "skills/tauri-desktop/SKILL.md",
+      "computedHash": "d0775b08784fbb223305958e3db54d2ef57a687769f9574a1988c0272d5810a6"
     },
     "tauri-development": {
       "source": "mindrally/skills",
