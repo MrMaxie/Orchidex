@@ -1,4 +1,4 @@
-use crate::models::{Graph, IgniteSparkRequest, RuntimeEvent};
+use crate::models::{Graph, IgniteSparkRequest, NodeCatalogResponse, RuntimeEvent};
 use crate::runtime::RuntimeHandle;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -15,6 +15,7 @@ pub fn router(runtime: RuntimeHandle) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/graph", get(get_graph).put(replace_graph))
+        .route("/nodes", get(get_node_catalog))
         .route("/sparks", post(ignite_spark))
         .route("/sparks/extinguish", post(extinguish_sparks))
         .route("/events", get(events))
@@ -41,6 +42,12 @@ async fn replace_graph(
     Json(graph): Json<Graph>,
 ) -> Result<Json<Graph>, ApiError> {
     Ok(Json(runtime.replace_graph(graph)?))
+}
+
+async fn get_node_catalog(
+    State(runtime): State<RuntimeHandle>,
+) -> Result<Json<NodeCatalogResponse>, ApiError> {
+    Ok(Json(runtime.node_catalog()))
 }
 
 async fn ignite_spark(

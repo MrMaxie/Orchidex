@@ -1,6 +1,8 @@
 use crate::models::{
-    default_graph, Graph, IgniteSparkRequest, NodeStatus, RuntimeEvent, Spark, SparkStatus,
+    default_graph, Graph, IgniteSparkRequest, NodeCatalogResponse, NodeStatus, RuntimeEvent, Spark,
+    SparkStatus,
 };
+use crate::nodes::discover_node_catalog;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
@@ -66,7 +68,9 @@ impl RuntimeHandle {
                 .collect();
             for spark in state.sparks.values_mut() {
                 if spark.status == SparkStatus::Active
-                    && !node_ids.iter().any(|node_id| node_id == &spark.current_node_id)
+                    && !node_ids
+                        .iter()
+                        .any(|node_id| node_id == &spark.current_node_id)
                 {
                     spark.status = SparkStatus::Blocked;
                     events.push(RuntimeEvent::SparkBlocked {
@@ -83,7 +87,12 @@ impl RuntimeHandle {
     pub fn ignite(&self, request: IgniteSparkRequest) -> Result<Spark, RuntimeError> {
         let (spark, epoch) = {
             let mut state = self.state.lock().map_err(|_| RuntimeError::LockPoisoned)?;
-            if !state.graph.nodes.iter().any(|node| node.id == request.node_id) {
+            if !state
+                .graph
+                .nodes
+                .iter()
+                .any(|node| node.id == request.node_id)
+            {
                 return Err(RuntimeError::MissingNode(request.node_id));
             }
 
@@ -140,6 +149,10 @@ impl RuntimeHandle {
         self.tx.subscribe()
     }
 
+    pub fn node_catalog(&self) -> NodeCatalogResponse {
+        discover_node_catalog(workspace_nodes_dir())
+    }
+
     async fn drive_spark(&self, spark_id: String, epoch: u64) {
         loop {
             sleep(Duration::from_millis(180)).await;
@@ -167,7 +180,12 @@ impl RuntimeHandle {
                 return Ok(AdvanceOutcome::Finished);
             }
 
-            if !state.graph.nodes.iter().any(|node| node.id == current.current_node_id) {
+            if !state
+                .graph
+                .nodes
+                .iter()
+                .any(|node| node.id == current.current_node_id)
+            {
                 if let Some(spark) = state.sparks.get_mut(spark_id) {
                     spark.status = SparkStatus::Blocked;
                 }
@@ -241,6 +259,13 @@ impl RuntimeHandle {
 enum AdvanceOutcome {
     Continue,
     Finished,
+}
+
+fn workspace_nodes_dir() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("core should live in workspace root")
+        .join("nodes")
 }
 
 #[cfg(test)]

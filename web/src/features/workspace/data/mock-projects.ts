@@ -1,4 +1,4 @@
-import type { CoreGraph } from "@/features/workspace/contracts";
+import type { CoreGraph, CoreNodeCatalogEntry } from "@/features/workspace/contracts";
 import type { CatalogNode, Project, ProjectGroup, WorkflowEdge, WorkflowNode } from "@/features/workspace/types";
 
 export const projectGroups: ProjectGroup[] = [
@@ -14,7 +14,7 @@ export const projectGroups: ProjectGroup[] = [
   },
 ];
 
-export const nodeCatalog: CatalogNode[] = [
+export const fallbackNodeCatalog: CatalogNode[] = [
   node("std/manual-ignite", "Manual Ignite", "Std", "Input", "Starts a spark from user-provided form data."),
   node("std/transmute", "Transmute", "Std", "Rhai", "Transforms payloads with Rhai."),
   node("std/accumulation", "Accumulation", "Std", "Queue", "Queues sparks and releases them by policy."),
@@ -155,5 +155,34 @@ function node(
   connector: string,
   description: string,
 ): CatalogNode {
-  return { id, label, app, connector, description };
+  return {
+    id,
+    label,
+    app,
+    connector,
+    description,
+    capabilities: [],
+    configSchemaHints: connector === "Input" ? ["form"] : [],
+    inputSchemaHints: [],
+    outputSchemaHints: [],
+  };
+}
+
+export function catalogNodeFromCoreEntry(entry: CoreNodeCatalogEntry): CatalogNode {
+  return {
+    id: entry.id,
+    label: entry.label,
+    app: formatCatalogApp(entry.id),
+    connector: entry.id,
+    description: entry.description,
+    capabilities: entry.capabilities,
+    configSchemaHints: Object.keys(entry.configSchema),
+    inputSchemaHints: Object.keys(entry.inputSchema),
+    outputSchemaHints: Object.keys(entry.outputSchema),
+  };
+}
+
+function formatCatalogApp(nodeId: string): string {
+  const prefix = nodeId.split("/")[0] ?? nodeId;
+  return prefix.charAt(0).toUpperCase() + prefix.slice(1);
 }

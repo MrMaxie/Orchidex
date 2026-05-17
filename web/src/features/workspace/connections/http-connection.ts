@@ -1,6 +1,7 @@
 import type {
   ConnectionStrategy,
   CoreGraph,
+  CoreNodeCatalogResponse,
   IgniteSparkInput,
   RuntimeEvent,
   Spark,
@@ -24,6 +25,7 @@ export function createHttpConnectionStrategy(
 
   return {
     getGraph: () => request<CoreGraph>("/graph"),
+    getNodeCatalog: () => request<CoreNodeCatalogResponse>("/nodes"),
     replaceGraph: (graph) =>
       request<CoreGraph>("/graph", {
         method: "PUT",

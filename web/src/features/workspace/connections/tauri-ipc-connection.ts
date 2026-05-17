@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   ConnectionStrategy,
   CoreGraph,
+  CoreNodeCatalogResponse,
   IgniteSparkInput,
   RuntimeEvent,
   Spark,
@@ -12,6 +13,7 @@ import type {
 export function createTauriIpcConnectionStrategy(): ConnectionStrategy {
   return {
     getGraph: () => invoke<CoreGraph>("get_graph"),
+    getNodeCatalog: () => invoke<CoreNodeCatalogResponse>("get_node_catalog"),
     replaceGraph: (graph) => invoke<CoreGraph>("replace_graph", { graph }),
     igniteSpark: (input: IgniteSparkInput) =>
       invoke<Spark>("ignite_spark", {

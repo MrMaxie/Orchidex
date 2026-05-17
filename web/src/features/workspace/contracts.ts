@@ -28,6 +28,27 @@ export type CoreGraphEdge = {
   label?: string | null;
 };
 
+export type CoreNodeCatalogEntry = {
+  id: string;
+  label: string;
+  description: string;
+  capabilities: string[];
+  configSchema: Record<string, JsonValue>;
+  inputSchema: Record<string, JsonValue>;
+  outputSchema: Record<string, JsonValue>;
+};
+
+export type CoreNodeCatalogDiagnostic = {
+  path: string;
+  message: string;
+  nodeId?: string | null;
+};
+
+export type CoreNodeCatalogResponse = {
+  entries: CoreNodeCatalogEntry[];
+  diagnostics: CoreNodeCatalogDiagnostic[];
+};
+
 export type SparkStatus = "active" | "blocked" | "completed" | "extinguished";
 
 export type Spark = {
@@ -69,6 +90,7 @@ export type IgniteSparkInput = {
 
 export type ConnectionStrategy = {
   getGraph: () => Promise<CoreGraph>;
+  getNodeCatalog: () => Promise<CoreNodeCatalogResponse>;
   replaceGraph: (graph: CoreGraph) => Promise<CoreGraph>;
   igniteSpark: (input: IgniteSparkInput) => Promise<Spark>;
   extinguishSparks: () => Promise<number>;

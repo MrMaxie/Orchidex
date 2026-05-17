@@ -108,8 +108,12 @@ impl<T> CommandResult<T> {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum RuntimeEvent {
-    GraphUpdated { graph: Graph },
-    SparkIgnited { spark: Spark },
+    GraphUpdated {
+        graph: Graph,
+    },
+    SparkIgnited {
+        spark: Spark,
+    },
     SparkMoved {
         spark_id: String,
         from_node_id: String,
@@ -120,10 +124,18 @@ pub enum RuntimeEvent {
         node_id: String,
         status: NodeStatus,
     },
-    SparkBlocked { spark_id: String, reason: String },
-    SparkExtinguished { spark_id: String },
+    SparkBlocked {
+        spark_id: String,
+        reason: String,
+    },
+    SparkExtinguished {
+        spark_id: String,
+    },
     AllSparksExtinguished,
-    Log { node_id: String, message: String },
+    Log {
+        node_id: String,
+        message: String,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -139,6 +151,23 @@ pub struct NodeCatalogEntry {
     pub input_schema: BTreeMap<String, Value>,
     #[serde(default)]
     pub output_schema: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeCatalogDiagnostic {
+    pub path: String,
+    pub message: String,
+    #[serde(default)]
+    pub node_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeCatalogResponse {
+    pub entries: Vec<NodeCatalogEntry>,
+    #[serde(default)]
+    pub diagnostics: Vec<NodeCatalogDiagnostic>,
 }
 
 pub fn default_graph() -> Graph {
@@ -183,7 +212,10 @@ pub fn default_graph() -> Graph {
                 id: "codex-plan".to_owned(),
                 kind: "codex/exec".to_owned(),
                 label: "Split tasks".to_owned(),
-                position: GraphPosition { x: 1200.0, y: 120.0 },
+                position: GraphPosition {
+                    x: 1200.0,
+                    y: 120.0,
+                },
                 config: serde_json::json!({ "model": "5.3", "effort": "high" }),
             },
         ],

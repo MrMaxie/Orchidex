@@ -53,6 +53,16 @@ export type CatalogNode = {
   app: string;
   description: string;
   connector: string;
+  capabilities: string[];
+  configSchemaHints: string[];
+  inputSchemaHints: string[];
+  outputSchemaHints: string[];
+};
+
+export type CatalogDiagnostic = {
+  path: string;
+  message: string;
+  nodeId?: string | null;
 };
 
 export type ProjectField = "name" | "owner" | "description" | "trigger";

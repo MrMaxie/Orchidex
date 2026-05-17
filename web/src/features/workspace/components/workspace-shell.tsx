@@ -1,4 +1,4 @@
-import { nodeCatalog, projectGroups } from "@/features/workspace/data/mock-projects";
+import { projectGroups } from "@/features/workspace/data/mock-projects";
 import { NodeCatalogDialog } from "@/features/workspace/components/catalog/node-catalog-dialog";
 import { InspectorPanel } from "@/features/workspace/components/inspector/inspector-panel";
 import { ProjectTree } from "@/features/workspace/components/navigation/project-tree";
@@ -55,7 +55,8 @@ export function WorkspaceShell({
       </div>
 
       <NodeCatalogDialog
-        catalog={nodeCatalog}
+        catalog={workspace.nodeCatalog}
+        diagnostics={workspace.catalogDiagnostics}
         isOpen={workspace.isCatalogOpen}
         onAddNode={workspace.addNodeFromCatalog}
         onOpenChange={workspace.setCatalogOpen}

@@ -1,4 +1,4 @@
-use orchidex_core::{Graph, IgniteSparkRequest, RuntimeHandle, Spark};
+use orchidex_core::{Graph, IgniteSparkRequest, NodeCatalogResponse, RuntimeHandle, Spark};
 use tauri::{Emitter, State};
 
 #[tauri::command]
@@ -14,6 +14,11 @@ fn replace_graph(runtime: State<'_, RuntimeHandle>, graph: Graph) -> Result<Grap
 }
 
 #[tauri::command]
+fn get_node_catalog(runtime: State<'_, RuntimeHandle>) -> Result<NodeCatalogResponse, String> {
+    Ok(runtime.node_catalog())
+}
+
+#[tauri::command]
 fn ignite_spark(
     runtime: State<'_, RuntimeHandle>,
     request: IgniteSparkRequest,
@@ -23,9 +28,7 @@ fn ignite_spark(
 
 #[tauri::command]
 fn extinguish_sparks(runtime: State<'_, RuntimeHandle>) -> Result<usize, String> {
-    runtime
-        .extinguish_all()
-        .map_err(|error| error.to_string())
+    runtime.extinguish_all().map_err(|error| error.to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -46,6 +49,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_graph,
+            get_node_catalog,
             replace_graph,
             ignite_spark,
             extinguish_sparks

@@ -25,7 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import type { CatalogNode } from "@/features/workspace/types";
+import type { CatalogDiagnostic, CatalogNode } from "@/features/workspace/types";
 
 type CatalogIcon = React.ForwardRefExoticComponent<
   IconProps & React.RefAttributes<SVGSVGElement>
@@ -42,11 +42,13 @@ const catalogIcons: Record<string, CatalogIcon> = {
 
 export function NodeCatalogDialog({
   catalog,
+  diagnostics,
   isOpen,
   onAddNode,
   onOpenChange,
 }: {
   catalog: CatalogNode[];
+  diagnostics: CatalogDiagnostic[];
   isOpen: boolean;
   onAddNode: (node: CatalogNode) => void;
   onOpenChange: (isOpen: boolean) => void;
@@ -93,6 +95,19 @@ export function NodeCatalogDialog({
                       <p className="line-clamp-2 text-xs/relaxed text-muted-foreground">
                         {catalogNode.description}
                       </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {catalogNode.capabilities.map((capability) => (
+                          <span
+                            className="rounded-sm border border-border/60 px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground"
+                            key={capability}
+                          >
+                            {capability}
+                          </span>
+                        ))}
+                        {renderSchemaHint("config", catalogNode.configSchemaHints)}
+                        {renderSchemaHint("input", catalogNode.inputSchemaHints)}
+                        {renderSchemaHint("output", catalogNode.outputSchemaHints)}
+                      </div>
                     </div>
                     <span
                       className={cn(
@@ -105,9 +120,41 @@ export function NodeCatalogDialog({
                 );
               })}
             </CommandGroup>
+            {diagnostics.length > 0 ? (
+              <CommandGroup heading="Catalog diagnostics">
+                {diagnostics.map((diagnostic) => (
+                  <div
+                    className="flex flex-col gap-1 border-b border-border/40 px-2 py-2 text-xs last:border-b-0"
+                    key={`${diagnostic.path}:${diagnostic.message}`}
+                  >
+                    <span className="font-medium text-foreground">
+                      {diagnostic.nodeId ?? "Unresolved node manifest"}
+                    </span>
+                    <span className="font-mono text-[0.625rem] text-muted-foreground">
+                      {diagnostic.path}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {diagnostic.message}
+                    </span>
+                  </div>
+                ))}
+              </CommandGroup>
+            ) : null}
           </CommandList>
         </Command>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function renderSchemaHint(kind: string, values: string[]) {
+  if (values.length === 0) {
+    return null;
+  }
+
+  return (
+    <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground">
+      {kind}: {values.join(", ")}
+    </span>
   );
 }

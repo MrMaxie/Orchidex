@@ -9,12 +9,15 @@ import {
 } from "@xyflow/react";
 
 import {
+  catalogNodeFromCoreEntry,
+  fallbackNodeCatalog,
   initialProjects,
   projectFromCoreGraph,
   workflowToCoreGraph,
 } from "@/features/workspace/data/mock-projects";
 import type { ConnectionStrategy, RuntimeEvent, Spark } from "@/features/workspace/contracts";
 import type {
+  CatalogDiagnostic,
   CatalogNode,
   InspectorTab,
   Project,
@@ -30,6 +33,8 @@ export function useWorkspaceState(connection: ConnectionStrategy | null) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>("manual-start");
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("node");
   const [isCatalogOpen, setCatalogOpen] = useState(false);
+  const [nodeCatalog, setNodeCatalog] = useState<CatalogNode[]>(fallbackNodeCatalog);
+  const [catalogDiagnostics, setCatalogDiagnostics] = useState<CatalogDiagnostic[]>([]);
 
   const activeProject = useMemo(
     () =>
@@ -82,6 +87,23 @@ export function useWorkspaceState(connection: ConnectionStrategy | null) {
       })
       .catch(() => {
         setProjects(initialProjects);
+      });
+
+    connection
+      .getNodeCatalog()
+      .then((catalog) => {
+        if (!active) {
+          return;
+        }
+        setNodeCatalog(catalog.entries.map(catalogNodeFromCoreEntry));
+        setCatalogDiagnostics(catalog.diagnostics);
+      })
+      .catch(() => {
+        if (!active) {
+          return;
+        }
+        setNodeCatalog(fallbackNodeCatalog);
+        setCatalogDiagnostics([]);
       });
 
     const unsubscribe = connection.subscribe((event) => {
@@ -269,9 +291,11 @@ export function useWorkspaceState(connection: ConnectionStrategy | null) {
     activeProject,
     activeProjectId,
     addNodeFromCatalog,
+    catalogDiagnostics,
     inspectorTab,
     isCatalogOpen,
     isRunning,
+    nodeCatalog,
     onConnect,
     onEdgesChange,
     onNodesChange,

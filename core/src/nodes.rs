@@ -1,4 +1,4 @@
-use crate::models::NodeCatalogEntry;
+use crate::models::{NodeCatalogDiagnostic, NodeCatalogEntry, NodeCatalogResponse};
 use rhai::{Dynamic, Engine, Map, Scope};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -97,11 +97,102 @@ impl NodeRegistry {
                 path: dir.to_owned(),
                 source,
             })?;
-            if entry.file_type().map(|file_type| file_type.is_dir()).unwrap_or(false) {
+            if entry
+                .file_type()
+                .map(|file_type| file_type.is_dir())
+                .unwrap_or(false)
+            {
                 self.walk(&entry.path())?;
             }
         }
         Ok(())
+    }
+}
+
+pub fn discover_node_catalog(root: impl AsRef<Path>) -> NodeCatalogResponse {
+    let root = root.as_ref();
+    let mut entries = Vec::new();
+    let mut diagnostics = Vec::new();
+    if !root.exists() {
+        return NodeCatalogResponse {
+            entries,
+            diagnostics,
+        };
+    }
+
+    walk_catalog(root, &mut entries, &mut diagnostics);
+    entries.sort_by(|left, right| left.id.cmp(&right.id));
+    diagnostics.sort_by(|left, right| left.path.cmp(&right.path));
+
+    NodeCatalogResponse {
+        entries,
+        diagnostics,
+    }
+}
+
+fn walk_catalog(
+    dir: &Path,
+    entries: &mut Vec<NodeCatalogEntry>,
+    diagnostics: &mut Vec<NodeCatalogDiagnostic>,
+) {
+    let manifest_path = dir.join("node.toml");
+    if manifest_path.exists() {
+        match fs::read_to_string(&manifest_path) {
+            Ok(content) => match toml::from_str::<NodeManifest>(&content) {
+                Ok(manifest) => {
+                    entries.push(NodeCatalogEntry {
+                        id: manifest.id,
+                        label: manifest.label,
+                        description: manifest.description,
+                        capabilities: manifest.capabilities,
+                        config_schema: manifest.config_schema,
+                        input_schema: manifest.input_schema,
+                        output_schema: manifest.output_schema,
+                    });
+                }
+                Err(source) => diagnostics.push(NodeCatalogDiagnostic {
+                    path: manifest_path.display().to_string(),
+                    message: source.to_string(),
+                    node_id: None,
+                }),
+            },
+            Err(source) => diagnostics.push(NodeCatalogDiagnostic {
+                path: manifest_path.display().to_string(),
+                message: source.to_string(),
+                node_id: None,
+            }),
+        }
+    }
+
+    let read_dir = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(source) => {
+            diagnostics.push(NodeCatalogDiagnostic {
+                path: dir.display().to_string(),
+                message: source.to_string(),
+                node_id: None,
+            });
+            return;
+        }
+    };
+
+    for entry in read_dir {
+        match entry {
+            Ok(entry) => {
+                if entry
+                    .file_type()
+                    .map(|file_type| file_type.is_dir())
+                    .unwrap_or(false)
+                {
+                    walk_catalog(&entry.path(), entries, diagnostics);
+                }
+            }
+            Err(source) => diagnostics.push(NodeCatalogDiagnostic {
+                path: dir.display().to_string(),
+                message: source.to_string(),
+                node_id: None,
+            }),
+        }
     }
 }
 
@@ -113,18 +204,15 @@ pub fn execute_rhai_entrypoint(script: &str, payload: Value) -> anyhow::Result<V
     engine.register_fn("shell", |command: &str| -> String {
         format!("shell delegation requested: {command}")
     });
-    engine.register_fn("cache_get", |_key: &str| -> Dynamic {
-        Dynamic::UNIT
-    });
+    engine.register_fn("cache_get", |_key: &str| -> Dynamic { Dynamic::UNIT });
     engine.register_fn("cache_set", |_key: &str, value: Dynamic| -> Dynamic {
         value
     });
-    engine.register_fn("freeze", |_key: &str, value: Dynamic| -> Dynamic {
-        value
-    });
-    engine.register_fn("schedule_after_ms", |_delay_ms: i64, value: Dynamic| -> Dynamic {
-        value
-    });
+    engine.register_fn("freeze", |_key: &str, value: Dynamic| -> Dynamic { value });
+    engine.register_fn(
+        "schedule_after_ms",
+        |_delay_ms: i64, value: Dynamic| -> Dynamic { value },
+    );
 
     let mut scope = Scope::new();
     scope.push_dynamic("payload", serde_json_to_dynamic(payload));
@@ -171,7 +259,9 @@ fn dynamic_to_json(value: Dynamic) -> Value {
     } else if let Some(value) = value.clone().try_cast::<i64>() {
         Value::Number(value.into())
     } else if let Some(value) = value.clone().try_cast::<f64>() {
-        serde_json::Number::from_f64(value).map(Value::Number).unwrap_or(Value::Null)
+        serde_json::Number::from_f64(value)
+            .map(Value::Number)
+            .unwrap_or(Value::Null)
     } else if let Some(value) = value.clone().try_cast::<String>() {
         Value::String(value)
     } else if let Some(values) = value.clone().try_cast::<rhai::Array>() {
@@ -193,8 +283,24 @@ mod tests {
 
     #[test]
     fn executes_basic_rhai_payload_transform() {
-        let output = execute_rhai_entrypoint("payload[\"answer\"] = 42; payload", serde_json::json!({}))
-            .expect("script should execute");
+        let output =
+            execute_rhai_entrypoint("payload[\"answer\"] = 42; payload", serde_json::json!({}))
+                .expect("script should execute");
         assert_eq!(output["answer"], 42);
+    }
+
+    #[test]
+    fn discovers_catalog_entries_without_diagnostics_for_valid_nodes() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("core should live in workspace root")
+            .join("nodes");
+        let catalog = discover_node_catalog(root);
+
+        assert!(catalog
+            .entries
+            .iter()
+            .any(|node| node.id == "std/manual-ignite"));
+        assert!(catalog.diagnostics.is_empty());
     }
 }
