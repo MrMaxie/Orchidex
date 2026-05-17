@@ -554,6 +554,23 @@ pub fn execute_rhai_entrypoint_with_context(
         });
     }
 
+    {
+        let journal = Arc::clone(&journal);
+        engine.register_fn("run_rhai", move |script: &str, value: Dynamic| -> Dynamic {
+            match execute_inline_rhai(script, dynamic_to_json(value.clone())) {
+                Ok(result) => serde_json_to_dynamic(result),
+                Err(error) => {
+                    if let Ok(mut journal) = journal.lock() {
+                        journal
+                            .diagnostics
+                            .push(format!("inline Rhai execution failed: {error}"));
+                    }
+                    value
+                }
+            }
+        });
+    }
+
     let mut scope = Scope::new();
     scope.push_dynamic("payload", serde_json_to_dynamic(payload));
     scope.push_dynamic("config", serde_json_to_dynamic(config));
@@ -600,6 +617,16 @@ fn manifest_to_catalog_entry(manifest: &NodeManifest) -> NodeCatalogEntry {
         input_ports: manifest.input_ports.clone(),
         output_ports: manifest.output_ports.clone(),
     }
+}
+
+fn execute_inline_rhai(script: &str, payload: Value) -> anyhow::Result<Value> {
+    let engine = Engine::new();
+    let mut scope = Scope::new();
+    scope.push_dynamic("payload", serde_json_to_dynamic(payload));
+    let output = engine
+        .eval_with_scope::<Dynamic>(&mut scope, script)
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    Ok(dynamic_to_json(output))
 }
 
 fn parse_execution_result(
@@ -1031,6 +1058,102 @@ mod tests {
 
         assert_eq!(result.status, NodeExecutionStatus::Continue);
         assert_eq!(result.payload["response"]["branch"], "feat/clients-project-mail-review");
+    }
+
+    #[test]
+    fn manual_ignite_node_passes_payload_through() {
+        let result = execute_rhai_file_with_context(
+            &node_entrypoint("nodes/std/manual-ignite/main.rhai"),
+            serde_json::json!({ "source": "mail" }),
+            serde_json::json!({}),
+            &NodeExecutionHost::default(),
+        )
+        .expect("manual ignite node should execute");
+
+        assert_eq!(result.payload["source"], "mail");
+    }
+
+    #[test]
+    fn transmute_node_executes_inline_script() {
+        let result = execute_rhai_file_with_context(
+            &node_entrypoint("nodes/std/transmute/main.rhai"),
+            serde_json::json!({ "source": "mail" }),
+            serde_json::json!({
+                "script": "payload[\"summary\"] = `${payload[\"source\"]} accepted`; payload"
+            }),
+            &NodeExecutionHost::default(),
+        )
+        .expect("transmute node should execute");
+
+        assert_eq!(result.payload["summary"], "mail accepted");
+    }
+
+    #[test]
+    fn filter_node_completes_rejected_payloads() {
+        let result = execute_rhai_file_with_context(
+            &node_entrypoint("nodes/std/filter/main.rhai"),
+            serde_json::json!({ "priority": "low" }),
+            serde_json::json!({
+                "predicate": "payload[\"priority\"] == \"high\""
+            }),
+            &NodeExecutionHost::default(),
+        )
+        .expect("filter node should execute");
+
+        assert_eq!(result.status, NodeExecutionStatus::Complete);
+        assert!(result
+            .diagnostics
+            .iter()
+            .any(|message| message.contains("filter rejected payload")));
+    }
+
+    #[test]
+    fn merge_node_combines_object_payloads() {
+        let result = execute_rhai_file_with_context(
+            &node_entrypoint("nodes/std/merge/main.rhai"),
+            serde_json::json!({
+                "items": [
+                    { "branch": "feat/x" },
+                    { "summary": "ready" }
+                ]
+            }),
+            serde_json::json!({ "strategy": "object" }),
+            &NodeExecutionHost::default(),
+        )
+        .expect("merge node should execute");
+
+        assert_eq!(result.payload["branch"], "feat/x");
+        assert_eq!(result.payload["summary"], "ready");
+    }
+
+    #[test]
+    fn accumulation_node_waits_when_locked() {
+        let result = execute_rhai_file_with_context(
+            &node_entrypoint("nodes/std/accumulation/main.rhai"),
+            serde_json::json!({ "ticket": 1 }),
+            serde_json::json!({ "locked": true }),
+            &NodeExecutionHost::default(),
+        )
+        .expect("accumulation node should execute");
+
+        assert_eq!(result.status, NodeExecutionStatus::Wait);
+    }
+
+    #[test]
+    fn manual_accept_node_waits_for_review() {
+        let result = execute_rhai_file_with_context(
+            &node_entrypoint("nodes/std/manual-accept/main.rhai"),
+            serde_json::json!({ "ticket": 1 }),
+            serde_json::json!({ "prompt": "Approve release?" }),
+            &NodeExecutionHost::default(),
+        )
+        .expect("manual accept node should execute");
+
+        assert_eq!(result.status, NodeExecutionStatus::Wait);
+        assert!(result
+            .diagnostics
+            .iter()
+            .any(|message| message.contains("Approve release?")));
     }
 
     #[test]
