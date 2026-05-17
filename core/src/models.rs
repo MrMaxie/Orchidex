@@ -438,4 +438,43 @@ mod tests {
         assert_eq!(value["targetPort"], "intake");
         assert_eq!(value["label"], "route metadata");
     }
+
+    #[test]
+    fn runtime_snapshot_serializes_spark_state_without_workflow_status() {
+        let snapshot = RuntimeSnapshot {
+            graph: default_graph(),
+            active_sparks: vec![Spark {
+                id: "spark-1".to_owned(),
+                current_node_id: "manual-start".to_owned(),
+                payload: serde_json::json!({ "ticket": 42 }),
+                status: SparkStatus::Active,
+            }],
+            run_history: vec![RunHistoryEntry {
+                spark_id: "spark-2".to_owned(),
+                graph_id: "clients-project".to_owned(),
+                final_status: SparkStatus::Completed,
+                last_node_id: "codex-plan".to_owned(),
+                reason: Some("completed".to_owned()),
+            }],
+            diagnostics: vec![],
+            traces: vec![SparkTraceStep {
+                spark_id: "spark-1".to_owned(),
+                node_id: "manual-start".to_owned(),
+                event: "entered".to_owned(),
+                edge_id: None,
+                reason: None,
+            }],
+            cache_entries: BTreeMap::new(),
+            freezer_entries: BTreeMap::new(),
+        };
+
+        let value = serde_json::to_value(snapshot).expect("snapshot should serialize");
+
+        assert!(value.get("activeSparks").is_some());
+        assert!(value.get("runHistory").is_some());
+        assert!(value.get("traces").is_some());
+        assert!(value.get("workflowStatus").is_none());
+        assert!(value.get("workflowState").is_none());
+        assert!(value.get("status").is_none());
+    }
 }

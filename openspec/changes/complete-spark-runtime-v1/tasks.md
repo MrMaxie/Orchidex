@@ -14,6 +14,6 @@
 ## 3. Validation
 
 - [x] 3.1 Add Rust tests for concurrent sparks, extinguish-all, live edits, failure states, waiting states, and persistence replay.
-- [ ] 3.1.a Add contract coverage proving workflow activity is derived from spark events and not from a persisted workflow status field.
+- [x] 3.1.a Add contract coverage proving workflow activity is derived from spark events and not from a persisted workflow status field.
 - [x] 3.2 Update fixture scenario coverage for the v1 runtime path.
 - [x] 3.3 Run `cargo test --workspace`, `bun run check`, `bun run build:web`, and `bun run core -- run-scenario`.

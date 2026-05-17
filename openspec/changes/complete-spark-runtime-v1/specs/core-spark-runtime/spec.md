@@ -22,6 +22,10 @@ The v1 runtime SHALL represent active work through spark state and SHALL NOT req
 - **WHEN** one or more sparks are active, waiting, queued, blocked, failed, completed, or extinguished
 - **THEN** clients derive workflow activity from the spark summaries and emitted runtime events
 
+#### Scenario: Runtime snapshot is persisted
+- **WHEN** the runtime serializes its local snapshot for persistence
+- **THEN** the snapshot contains spark summaries, run history, and trace records without a workflow-level status, state, started, stopped, or running field
+
 ### Requirement: Spark ignition
 The v1 runtime SHALL ignite sparks at valid graph nodes, valid graph portal entries, or runtime-supported scheduled entrypoints, and SHALL reject unknown entrypoints with deterministic errors.
 
