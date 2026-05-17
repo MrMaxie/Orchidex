@@ -816,6 +816,17 @@ mod tests {
     use super::*;
     use crate::models::{Graph, GraphEdge, GraphNode, GraphPosition};
 
+    fn workspace_root() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("core should live in workspace root")
+            .to_path_buf()
+    }
+
+    fn node_entrypoint(path: &str) -> PathBuf {
+        workspace_root().join(path)
+    }
+
     #[test]
     fn executes_basic_rhai_payload_transform() {
         let output =
@@ -856,10 +867,7 @@ mod tests {
 
     #[test]
     fn reports_missing_ports_and_cardinality_violations() {
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .expect("core should live in workspace root")
-            .join("nodes");
+        let root = workspace_root().join("nodes");
         let registry = NodeRegistry::load_from(root).expect("node registry should load");
         let graph = Graph {
             id: "graph".to_owned(),
@@ -930,5 +938,98 @@ mod tests {
         assert!(diagnostics.iter().any(|diagnostic| diagnostic
             .message
             .contains("input port 'in' on node 'left' allows only one connection")));
+    }
+
+    #[test]
+    fn sleep_node_returns_wait_outcome() {
+        let result = execute_rhai_file_with_context(
+            &node_entrypoint("nodes/std/sleep/main.rhai"),
+            serde_json::json!({ "job": "demo" }),
+            serde_json::json!({ "delay_ms": 25 }),
+            &NodeExecutionHost::default(),
+        )
+        .expect("sleep node should execute");
+
+        assert_eq!(result.status, NodeExecutionStatus::Wait);
+        assert_eq!(result.wait.and_then(|wait| wait.delay_ms), Some(25));
+    }
+
+    #[test]
+    fn cron_node_returns_wait_reason() {
+        let result = execute_rhai_file_with_context(
+            &node_entrypoint("nodes/std/cron/main.rhai"),
+            serde_json::json!({ "job": "demo" }),
+            serde_json::json!({ "schedule": "0 * * * *" }),
+            &NodeExecutionHost::default(),
+        )
+        .expect("cron node should execute");
+
+        assert_eq!(result.status, NodeExecutionStatus::Wait);
+        assert_eq!(
+            result.wait.and_then(|wait| wait.reason),
+            Some("0 * * * *".to_owned())
+        );
+    }
+
+    #[test]
+    fn cache_node_prefers_cached_payloads() {
+        let result = execute_rhai_file_with_context(
+            &node_entrypoint("nodes/std/cache/main.rhai"),
+            serde_json::json!({ "fresh": true }),
+            serde_json::json!({ "key": "ticket-1" }),
+            &NodeExecutionHost {
+                cache_entries: BTreeMap::from([(
+                    "ticket-1".to_owned(),
+                    serde_json::json!({ "cached": true }),
+                )]),
+                freezer_entries: BTreeMap::new(),
+                fixture_root: workspace_root(),
+            },
+        )
+        .expect("cache node should execute");
+
+        assert_eq!(result.status, NodeExecutionStatus::Continue);
+        assert_eq!(result.payload, serde_json::json!({ "cached": true }));
+    }
+
+    #[test]
+    fn freezer_node_returns_frozen_payloads() {
+        let result = execute_rhai_file_with_context(
+            &node_entrypoint("nodes/std/freezer/main.rhai"),
+            serde_json::json!({ "fresh": true }),
+            serde_json::json!({ "key": "ticket-1" }),
+            &NodeExecutionHost {
+                cache_entries: BTreeMap::new(),
+                freezer_entries: BTreeMap::from([(
+                    "ticket-1".to_owned(),
+                    serde_json::json!({ "frozen": true }),
+                )]),
+                fixture_root: workspace_root(),
+            },
+        )
+        .expect("freezer node should execute");
+
+        assert_eq!(result.status, NodeExecutionStatus::Continue);
+        assert_eq!(result.payload, serde_json::json!({ "frozen": true }));
+    }
+
+    #[test]
+    fn codex_node_reads_fixture_payloads() {
+        let result = execute_rhai_file_with_context(
+            &node_entrypoint("nodes/codex/exec/main.rhai"),
+            serde_json::json!({ "goal": "branch" }),
+            serde_json::json!({
+                "fixture": "examples/fixtures/clients-project/codex-select-branch.json"
+            }),
+            &NodeExecutionHost {
+                cache_entries: BTreeMap::new(),
+                freezer_entries: BTreeMap::new(),
+                fixture_root: workspace_root(),
+            },
+        )
+        .expect("codex node should execute");
+
+        assert_eq!(result.status, NodeExecutionStatus::Continue);
+        assert_eq!(result.payload["response"]["branch"], "feat/clients-project-mail-review");
     }
 }

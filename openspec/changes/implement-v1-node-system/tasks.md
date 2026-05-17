@@ -11,7 +11,7 @@
 
 - [ ] 2.1 Implement and test `std/manual-ignite`, `std/transmute`, `std/accumulation`, `std/filter`, `std/merge`, and `std/manual-accept`.
 - [ ] 2.2 Implement and test `debug/log`, `debug/placeholder-echo`, `debug/placeholder-rhai`, and `debug/note`.
-- [ ] 2.3 Implement and test `std/sleep`, `std/cron`, `std/freezer`, `std/cache`, and `codex/exec`.
+- [x] 2.3 Implement and test `std/sleep`, `std/cron`, `std/freezer`, `std/cache`, and `codex/exec`.
 
 ## 3. Authoring And Fixtures
 
