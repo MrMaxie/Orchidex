@@ -2,6 +2,7 @@ import type { Edge, Node } from "@xyflow/react";
 import type {
   CoreGraph,
   CoreProjectMetadata,
+  RuntimeDiagnostic,
   RuntimeEvent,
   Spark,
   WorkflowActivitySummary,
@@ -16,6 +17,7 @@ export type NodeStatus =
   | "failed"
   | "blocked";
 export type InspectorTab = "project" | "node";
+export type WorkspaceView = "dashboard" | "workflow";
 
 export type WorkflowNodeData = Record<string, unknown> & {
   label: string;
@@ -47,8 +49,9 @@ export type WorkflowActivity = WorkflowActivitySummary;
 
 export type Project = {
   metadata: ProjectMetadata;
-  workflow: WorkflowGraphData;
+  workflows: WorkflowGraphData[];
   activity: WorkflowActivity;
+  diagnostics: RuntimeDiagnostic[];
   sparks: Record<string, Spark>;
   eventLog: RuntimeEvent[];
 };

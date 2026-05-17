@@ -18,7 +18,7 @@
     "build:web": "turbo run build --filter=@orchidex/web",
     "build:desktop": "turbo run build --filter=@orchidex/tauri",
     "check": "turbo run check",
-    "test": "turbo run test --filter=@orchidex/core --filter=@orchidex/tauri",
+    "test": "turbo run test",
     "preview": "turbo run preview --filter=@orchidex/web",
     "core": "cargo run -p orchidex-core --",
     "core:serve": "turbo run dev --filter=@orchidex/core",

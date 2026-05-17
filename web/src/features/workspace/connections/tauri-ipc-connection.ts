@@ -7,14 +7,21 @@ import type {
   CoreNodeCatalogResponse,
   IgniteSparkInput,
   ResolveManualGateInput,
+  RunHistoryEntry,
+  RuntimeDiagnostic,
   RuntimeEvent,
   Spark,
+  SparkTraceStep,
 } from "@/features/workspace/contracts";
 
 export function createTauriIpcConnectionStrategy(): ConnectionStrategy {
   return {
     getGraph: () => invoke<CoreGraph>("get_graph"),
     getNodeCatalog: () => invoke<CoreNodeCatalogResponse>("get_node_catalog"),
+    getRunHistory: () => invoke<RunHistoryEntry[]>("get_run_history"),
+    getRuntimeDiagnostics: () =>
+      invoke<RuntimeDiagnostic[]>("get_runtime_diagnostics"),
+    getRuntimeTraces: () => invoke<SparkTraceStep[]>("get_runtime_traces"),
     replaceGraph: (graph) => invoke<CoreGraph>("replace_graph", { graph }),
     igniteSpark: (input: IgniteSparkInput) =>
       invoke<Spark>("ignite_spark", {

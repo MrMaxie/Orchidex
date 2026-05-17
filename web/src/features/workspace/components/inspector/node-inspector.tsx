@@ -1,6 +1,7 @@
 import { IconFileCode } from "@tabler/icons-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Field,
   FieldGroup,
@@ -27,9 +28,13 @@ import type {
 export function NodeInspector({
   node,
   onNodeChange,
+  onReleaseQueue,
+  onResolveManualGate,
 }: {
   node: WorkflowNode | null;
   onNodeChange: (field: keyof WorkflowNodeData, value: string) => void;
+  onReleaseQueue: () => void;
+  onResolveManualGate: () => void;
 }) {
   if (!node) {
     return (
@@ -48,6 +53,8 @@ export function NodeInspector({
 
   const status = nodeStatusMeta[node.data.status];
   const StatusIcon = status.icon;
+  const canReleaseQueue = node.data.connector === "std/accumulation";
+  const canResolveManualGate = node.data.connector === "std/manual-accept";
 
   return (
     <div className="flex flex-col gap-4">
@@ -126,6 +133,21 @@ export function NodeInspector({
       </section>
 
       <FieldSeparator>Execution notes</FieldSeparator>
+
+      {(canReleaseQueue || canResolveManualGate) && (
+        <div className="flex flex-wrap gap-2">
+          {canReleaseQueue && (
+            <Button onClick={onReleaseQueue} size="sm" type="button" variant="outline">
+              Release queue
+            </Button>
+          )}
+          {canResolveManualGate && (
+            <Button onClick={onResolveManualGate} size="sm" type="button" variant="outline">
+              Resolve gate
+            </Button>
+          )}
+        </div>
+      )}
 
       <Field>
         <FieldLabel htmlFor="node-description">Description</FieldLabel>

@@ -4,8 +4,11 @@ import type {
   CoreNodeCatalogResponse,
   IgniteSparkInput,
   ResolveManualGateInput,
+  RunHistoryEntry,
+  RuntimeDiagnostic,
   RuntimeEvent,
   Spark,
+  SparkTraceStep,
 } from "@/features/workspace/contracts";
 
 export function createHttpConnectionStrategy(
@@ -27,6 +30,10 @@ export function createHttpConnectionStrategy(
   return {
     getGraph: () => request<CoreGraph>("/graph"),
     getNodeCatalog: () => request<CoreNodeCatalogResponse>("/nodes"),
+    getRunHistory: () => request<RunHistoryEntry[]>("/runtime/history"),
+    getRuntimeDiagnostics: () =>
+      request<RuntimeDiagnostic[]>("/runtime/diagnostics"),
+    getRuntimeTraces: () => request<SparkTraceStep[]>("/runtime/traces"),
     replaceGraph: (graph) =>
       request<CoreGraph>("/graph", {
         method: "PUT",

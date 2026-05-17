@@ -2,15 +2,25 @@ import {
   Background,
   Controls,
   MiniMap,
+  Panel,
   ReactFlow,
+  useReactFlow,
   type Connection,
   type EdgeChange,
   type NodeChange,
 } from "@xyflow/react";
+import { IconFocusCentered, IconPointer, IconPlus } from "@tabler/icons-react";
+import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { WorkflowCardNode } from "@/features/workspace/components/workflow-card-node";
-import type { Project, WorkflowNode } from "@/features/workspace/types";
+import type { WorkflowGraphData, WorkflowNode } from "@/features/workspace/types";
 
 const nodeTypes = {
   workflowNode: WorkflowCardNode,
@@ -26,27 +36,31 @@ export function WorkflowCanvas({
   onConnect,
   onEdgesChange,
   onNodesChange,
+  onOpenCatalog,
   onSelectNode,
-  project,
+  onSelectionClear,
   setSelectedNodeId,
   visibleNodes,
+  workflow,
 }: {
   isRunning: boolean;
   onConnect: (connection: Connection) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onNodesChange: (changes: NodeChange<WorkflowNode>[]) => void;
+  onOpenCatalog: () => void;
   onSelectNode: () => void;
-  project: Project;
+  onSelectionClear: () => void;
   setSelectedNodeId: (nodeId: string | null) => void;
   visibleNodes: WorkflowNode[];
+  workflow: WorkflowGraphData;
 }) {
   return (
-    <div className="min-h-0 p-3">
-      <div className="relative h-full min-h-[34rem] overflow-hidden rounded-lg border border-border bg-background/80 shadow-2xl shadow-black/30">
+    <div className="min-h-0">
+      <div className="relative h-full min-h-[34rem] overflow-hidden border-border bg-background/80 shadow-2xl shadow-black/30">
         <ReactFlow
           attributionPosition="bottom-left"
           defaultEdgeOptions={defaultEdgeOptions}
-          edges={project.workflow.edges}
+          edges={workflow.edges}
           edgesReconnectable
           elementsSelectable
           fitView
@@ -61,12 +75,12 @@ export function WorkflowCanvas({
             onSelectNode();
           }}
           onNodesChange={onNodesChange}
-          onPaneClick={() => setSelectedNodeId(null)}
+          onPaneClick={onSelectionClear}
           proOptions={{ hideAttribution: true }}
         >
           <Background color="var(--workflow-grid)" gap={28} />
           <MiniMap
-            className="!border !border-border !bg-popover"
+            className="!h-24 !w-36 !border !border-border !bg-popover"
             maskColor="color-mix(in oklch, var(--background) 74%, transparent)"
             nodeColor={(node) => {
               const workflowNode = node as WorkflowNode;
@@ -82,22 +96,69 @@ export function WorkflowCanvas({
               return "var(--workflow-status-idle)";
             }}
             pannable
+            style={{ height: 96, width: 144 }}
             zoomable
           />
           <Controls className="!border-border !bg-popover !text-foreground" />
+          <Panel position="top-left">
+            <div className="flex items-center gap-2 rounded-md border border-border bg-popover/95 p-1 shadow-lg">
+              <Badge variant={isRunning ? "default" : "outline"}>
+                {isRunning ? "Live sparks" : "Editable graph"}
+              </Badge>
+              <CanvasIconButton
+                label="Add node"
+                onClick={onOpenCatalog}
+                icon={<IconPlus aria-hidden data-icon="inline-start" stroke={1.7} />}
+              />
+              <CanvasFitButton />
+              <CanvasIconButton
+                label="Clear selection"
+                onClick={onSelectionClear}
+                icon={<IconPointer aria-hidden data-icon="inline-start" stroke={1.7} />}
+              />
+            </div>
+          </Panel>
         </ReactFlow>
-
-        <div className="pointer-events-none absolute left-3 top-3 max-w-sm rounded-md border border-border bg-popover/90 p-3 shadow-lg shadow-black/20 backdrop-blur">
-          <Badge variant={isRunning ? "default" : "outline"}>
-            {isRunning ? "Live run preview" : "Workflow editor"}
-          </Badge>
-          <p className="mt-2 text-xs/relaxed text-muted-foreground">
-            {isRunning
-              ? "Sparks are live. You can still edit nodes and edges while runtime events update the canvas."
-              : "Drag nodes, connect handles, or add a block from the node collection."}
-          </p>
-        </div>
       </div>
     </div>
+  );
+}
+
+function CanvasFitButton() {
+  const { fitView } = useReactFlow();
+
+  return (
+    <CanvasIconButton
+      icon={<IconFocusCentered aria-hidden data-icon="inline-start" stroke={1.7} />}
+      label="Fit view"
+      onClick={() => fitView({ duration: 180, padding: 0.2 })}
+    />
+  );
+}
+
+function CanvasIconButton({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          aria-label={label}
+          onClick={onClick}
+          size="icon-sm"
+          type="button"
+          variant="outline"
+        >
+          {icon}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }

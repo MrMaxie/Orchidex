@@ -9,12 +9,18 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { projectStatusMeta } from "@/features/workspace/config/status-meta";
-import type { Project, ProjectField } from "@/features/workspace/types";
+import type {
+  Project,
+  ProjectField,
+  WorkflowGraphData,
+} from "@/features/workspace/types";
 
 export function ProjectInspector({
+  activeWorkflow,
   onFieldChange,
   project,
 }: {
+  activeWorkflow: WorkflowGraphData | null;
   onFieldChange: (field: ProjectField, value: string) => void;
   project: Project;
 }) {
@@ -100,10 +106,25 @@ export function ProjectInspector({
       <FieldSeparator>Graph</FieldSeparator>
 
       <section className="grid grid-cols-3 gap-2 text-xs">
-        <Metric label="Nodes" value={project.workflow.nodes.length.toString()} />
-        <Metric label="Edges" value={project.workflow.edges.length.toString()} />
+        <Metric label="Workflows" value={project.workflows.length.toString()} />
+        <Metric label="Nodes" value={(activeWorkflow?.nodes.length ?? 0).toString()} />
+        <Metric label="Edges" value={(activeWorkflow?.edges.length ?? 0).toString()} />
         <Metric label="Ready" value={`${project.activity.progress}%`} />
       </section>
+
+      {project.diagnostics[0] && (
+        <>
+          <FieldSeparator>Latest diagnostic</FieldSeparator>
+          <section className="rounded-md border border-border bg-muted/30 p-2 text-xs">
+            <p className="font-medium text-foreground">
+              {project.diagnostics[0].kind}
+            </p>
+            <p className="mt-1 text-muted-foreground">
+              {project.diagnostics[0].message}
+            </p>
+          </section>
+        </>
+      )}
     </div>
   );
 }

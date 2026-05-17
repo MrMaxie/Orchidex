@@ -20,15 +20,21 @@ import { ProjectTreeFile } from "@/features/workspace/components/navigation/proj
 import type { Project, ProjectGroup } from "@/features/workspace/types";
 
 export function ProjectTreeFolder({
-  activeProjectId,
+  activeWorkflowId,
   group,
+  onCreateWorkflow,
   onProjectSelect,
+  onWorkflowSelect,
   projects,
+  selectedProjectId,
 }: {
-  activeProjectId: string;
+  activeWorkflowId: string | null;
   group: ProjectGroup;
+  onCreateWorkflow: (projectId: string) => void;
   onProjectSelect: (projectId: string) => void;
+  onWorkflowSelect: (workflowId: string) => void;
   projects: Project[];
+  selectedProjectId: string | null;
 }) {
   const [isOpen, setIsOpen] = useState(true);
   const FolderIcon = isOpen ? IconFolderOpen : IconFolder;
@@ -75,9 +81,12 @@ export function ProjectTreeFolder({
           {projects.length > 0 ? (
             projects.map((project) => (
               <ProjectTreeFile
-                isActive={project.metadata.id === activeProjectId}
+                activeWorkflowId={activeWorkflowId}
+                isActive={project.metadata.id === selectedProjectId}
                 key={project.metadata.id}
-                onSelect={onProjectSelect}
+                onCreateWorkflow={onCreateWorkflow}
+                onProjectSelect={onProjectSelect}
+                onWorkflowSelect={onWorkflowSelect}
                 project={project}
               />
             ))

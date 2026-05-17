@@ -7,22 +7,29 @@ import type {
   InspectorTab,
   Project,
   ProjectField,
+  WorkflowGraphData,
   WorkflowNode,
   WorkflowNodeData,
 } from "@/features/workspace/types";
 
 export function InspectorPanel({
   activeNode,
+  activeWorkflow,
   inspectorTab,
   onNodeChange,
   onProjectFieldChange,
+  onReleaseQueue,
+  onResolveManualGate,
   project,
   setInspectorTab,
 }: {
   activeNode: WorkflowNode | null;
+  activeWorkflow: WorkflowGraphData | null;
   inspectorTab: InspectorTab;
   onNodeChange: (field: keyof WorkflowNodeData, value: string) => void;
   onProjectFieldChange: (field: ProjectField, value: string) => void;
+  onReleaseQueue: () => void;
+  onResolveManualGate: () => void;
   project: Project;
   setInspectorTab: (tab: InspectorTab) => void;
 }) {
@@ -43,12 +50,18 @@ export function InspectorPanel({
         <ScrollArea className="min-h-0 flex-1">
           <TabsContent className="m-0 p-3" value="project">
             <ProjectInspector
+              activeWorkflow={activeWorkflow}
               onFieldChange={onProjectFieldChange}
               project={project}
             />
           </TabsContent>
           <TabsContent className="m-0 p-3" value="node">
-            <NodeInspector node={activeNode} onNodeChange={onNodeChange} />
+            <NodeInspector
+              node={activeNode}
+              onNodeChange={onNodeChange}
+              onReleaseQueue={onReleaseQueue}
+              onResolveManualGate={onResolveManualGate}
+            />
           </TabsContent>
         </ScrollArea>
       </Tabs>

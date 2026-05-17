@@ -1,5 +1,12 @@
 import type { CoreGraph, CoreNodeCatalogEntry } from "@/features/workspace/contracts";
-import type { CatalogNode, Project, ProjectGroup, WorkflowEdge, WorkflowNode } from "@/features/workspace/types";
+import type {
+  CatalogNode,
+  Project,
+  ProjectGroup,
+  WorkflowEdge,
+  WorkflowGraphData,
+  WorkflowNode,
+} from "@/features/workspace/types";
 
 export const projectGroups: ProjectGroup[] = [
   {
@@ -83,9 +90,6 @@ const clientsProjectGraph: CoreGraph = {
 export const initialProjects: Project[] = [projectFromCoreGraph(clientsProjectGraph)];
 
 export function projectFromCoreGraph(graph: CoreGraph): Project {
-  const nodes = graph.nodes.map(toWorkflowNode);
-  const edges = graph.edges.map(toWorkflowEdge);
-
   return {
     metadata: {
       id: graph.id,
@@ -97,14 +101,7 @@ export function projectFromCoreGraph(graph: CoreGraph): Project {
       description: "Fixture-backed spark graph for clients-project acceptance work.",
       trigger: "Manual ignite",
     },
-    workflow: {
-      id: graph.id,
-      projectId: graph.id,
-      name: graph.name,
-      nodes,
-      edges,
-      coreGraph: graph,
-    },
+    workflows: [workflowFromCoreGraph(graph, graph.id)],
     activity: {
       status: "idle",
       progress: 0,
@@ -113,25 +110,56 @@ export function projectFromCoreGraph(graph: CoreGraph): Project {
       completedSparkCount: 0,
       extinguishedSparkCount: 0,
     },
+    diagnostics: [],
     sparks: {},
     eventLog: [],
   };
 }
 
-export function workflowToCoreGraph(project: Project): CoreGraph {
+export function workflowFromCoreGraph(
+  graph: CoreGraph,
+  projectId: string,
+): WorkflowGraphData {
   return {
-    ...project.workflow.coreGraph,
-    name: project.workflow.name,
-    nodes: project.workflow.nodes.map((node) => ({
+    id: graph.id,
+    projectId,
+    name: graph.name,
+    nodes: graph.nodes.map(toWorkflowNode),
+    edges: graph.edges.map(toWorkflowEdge),
+    coreGraph: graph,
+  };
+}
+
+export function createEmptyWorkflow(
+  projectId: string,
+  workflowId: string,
+  name: string,
+): WorkflowGraphData {
+  const graph: CoreGraph = {
+    id: workflowId,
+    name,
+    nodes: [],
+    edges: [],
+  };
+
+  return workflowFromCoreGraph(graph, projectId);
+}
+
+export function workflowToCoreGraph(workflow: WorkflowGraphData): CoreGraph {
+  return {
+    ...workflow.coreGraph,
+    id: workflow.id,
+    name: workflow.name,
+    nodes: workflow.nodes.map((node) => ({
       id: node.id,
       kind: node.data.connector,
       label: node.data.label,
       position: node.position,
       config:
-        project.workflow.coreGraph.nodes.find((coreNode) => coreNode.id === node.id)
+        workflow.coreGraph.nodes.find((coreNode) => coreNode.id === node.id)
           ?.config ?? {},
     })),
-    edges: project.workflow.edges.map((edge) => ({
+    edges: workflow.edges.map((edge) => ({
       id: edge.id,
       source: edge.source,
       sourcePort: edge.sourceHandle ?? "out",
