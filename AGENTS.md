@@ -27,6 +27,11 @@
 - Use Bun for frontend dependencies and Cargo for Rust dependencies; do not hand-edit dependency versions when a package manager command can do it.
 - Add npm packages with exact versions, for example `bun add <pkg> --exact` or `bun add --dev <pkg> --exact`.
 - Tailwind CSS uses v4 CSS-first setup through `@tailwindcss/vite`; do not add legacy Tailwind v3 PostCSS config unless the project explicitly migrates.
+- The app uses the `@/*` import alias for `src/*`; keep Vite and TypeScript alias configuration aligned.
+- Shadcn is initialized with `components.json`; add or update UI primitives with `bunx --bun shadcn@latest`, then review the generated source under `src/components/ui/`.
+- Use shadcn `ScrollArea` for scrollable app panes instead of native overflow-only scrollbars, especially sidebars, inspectors, and modal lists.
+- Prefer shadcn primitives such as `Button`, `Badge`, `Tabs`, `Dialog`, `Command`, `Field`, `Input`, `Textarea`, `Select`, `Separator`, `Collapsible`, and `Tooltip` before custom UI markup.
+- Use Tabler icons for app-specific navigation and workflow status icons; generated shadcn primitives may use their configured icon library.
 - ReactFlow is provided by `@xyflow/react`; import its stylesheet after Tailwind in the global CSS entrypoint.
 - Keep outward-facing project files, code, comments, and commit messages in English unless the user asks otherwise.
 - Use conventional commits in English with `fix:`, `feat:`, or `chore:` and no scope.
