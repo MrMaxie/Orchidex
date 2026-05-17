@@ -10,6 +10,7 @@ use serde_json::Value;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -52,6 +53,64 @@ struct ManifestRecord {
 pub struct NodeRegistry {
     manifests: BTreeMap<String, ManifestRecord>,
     diagnostics: Vec<NodeCatalogDiagnostic>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct NodeExecutionHost {
+    pub cache_entries: BTreeMap<String, Value>,
+    pub freezer_entries: BTreeMap<String, Value>,
+    pub fixture_root: PathBuf,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum NodeExecutionStatus {
+    Continue,
+    Wait,
+    Blocked,
+    Failed,
+    Complete,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct NodeWait {
+    pub delay_ms: Option<u64>,
+    pub reason: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ShellInvocation {
+    pub command: String,
+    pub output: String,
+    pub exit_status: i64,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct NodeExecutionResult {
+    pub status: NodeExecutionStatus,
+    pub payload: Value,
+    pub route: Option<String>,
+    pub diagnostics: Vec<String>,
+    pub logs: Vec<String>,
+    pub wait: Option<NodeWait>,
+    pub cache_writes: BTreeMap<String, Value>,
+    pub freezer_writes: BTreeMap<String, Value>,
+    pub shell_invocations: Vec<ShellInvocation>,
+}
+
+impl Default for NodeExecutionStatus {
+    fn default() -> Self {
+        Self::Continue
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+struct NodeExecutionJournal {
+    logs: Vec<String>,
+    diagnostics: Vec<String>,
+    cache_writes: BTreeMap<String, Value>,
+    freezer_writes: BTreeMap<String, Value>,
+    shell_invocations: Vec<ShellInvocation>,
+    fatal_error: Option<String>,
 }
 
 impl NodeRegistry {
@@ -347,35 +406,186 @@ pub fn discover_node_catalog(root: impl AsRef<Path>) -> NodeCatalogResponse {
 }
 
 pub fn execute_rhai_entrypoint(script: &str, payload: Value) -> anyhow::Result<Value> {
+    let result = execute_rhai_entrypoint_with_context(
+        script,
+        payload,
+        Value::Object(Default::default()),
+        &NodeExecutionHost::default(),
+    )?;
+    Ok(result.payload)
+}
+
+pub fn execute_rhai_entrypoint_with_context(
+    script: &str,
+    payload: Value,
+    config: Value,
+    host: &NodeExecutionHost,
+) -> anyhow::Result<NodeExecutionResult> {
     let mut engine = Engine::new();
-    engine.register_fn("log", |message: &str| {
-        println!("{message}");
-    });
-    engine.register_fn("shell", |command: &str| -> String {
-        format!("shell delegation requested: {command}")
-    });
-    engine.register_fn("cache_get", |_key: &str| -> Dynamic { Dynamic::UNIT });
-    engine.register_fn("cache_set", |_key: &str, value: Dynamic| -> Dynamic {
-        value
-    });
-    engine.register_fn("freeze", |_key: &str, value: Dynamic| -> Dynamic { value });
+    let journal = Arc::new(Mutex::new(NodeExecutionJournal::default()));
+    let cache_entries = Arc::new(Mutex::new(host.cache_entries.clone()));
+    let freezer_entries = Arc::new(Mutex::new(host.freezer_entries.clone()));
+    let fixture_root = host.fixture_root.clone();
+
+    {
+        let journal = Arc::clone(&journal);
+        engine.register_fn("log", move |message: &str| {
+            if let Ok(mut journal) = journal.lock() {
+                journal.logs.push(message.to_owned());
+            }
+            println!("{message}");
+        });
+    }
+
+    {
+        let journal = Arc::clone(&journal);
+        engine.register_fn("shell", move |command: &str| -> String {
+            let output = format!("shell delegation requested: {command}");
+            if let Ok(mut journal) = journal.lock() {
+                journal.shell_invocations.push(ShellInvocation {
+                    command: command.to_owned(),
+                    output: output.clone(),
+                    exit_status: 0,
+                });
+                journal
+                    .diagnostics
+                    .push(format!("shell delegation recorded for '{command}'"));
+            }
+            output
+        });
+    }
+
+    {
+        let journal = Arc::clone(&journal);
+        let cache_entries = Arc::clone(&cache_entries);
+        engine.register_fn("cache_get", move |key: &str| -> Dynamic {
+            let cached = cache_entries
+                .lock()
+                .ok()
+                .and_then(|entries| entries.get(key).cloned());
+            if let Ok(mut journal) = journal.lock() {
+                journal.diagnostics.push(if cached.is_some() {
+                    format!("cache hit for key '{key}'")
+                } else {
+                    format!("cache miss for key '{key}'")
+                });
+            }
+            cached.map(serde_json_to_dynamic).unwrap_or(Dynamic::UNIT)
+        });
+    }
+
+    {
+        let journal = Arc::clone(&journal);
+        let cache_entries = Arc::clone(&cache_entries);
+        engine.register_fn("cache_set", move |key: &str, value: Dynamic| -> Dynamic {
+            let json_value = dynamic_to_json(value.clone());
+            if let Ok(mut entries) = cache_entries.lock() {
+                entries.insert(key.to_owned(), json_value.clone());
+            }
+            if let Ok(mut journal) = journal.lock() {
+                journal.cache_writes.insert(key.to_owned(), json_value);
+            }
+            value
+        });
+    }
+
+    {
+        let journal = Arc::clone(&journal);
+        let freezer_entries = Arc::clone(&freezer_entries);
+        engine.register_fn("freeze", move |key: &str, value: Dynamic| -> Dynamic {
+            if let Ok(entries) = freezer_entries.lock() {
+                if let Some(existing) = entries.get(key) {
+                    return serde_json_to_dynamic(existing.clone());
+                }
+            }
+
+            let json_value = dynamic_to_json(value.clone());
+            if let Ok(mut entries) = freezer_entries.lock() {
+                entries.insert(key.to_owned(), json_value.clone());
+            }
+            if let Ok(mut journal) = journal.lock() {
+                journal.freezer_writes.insert(key.to_owned(), json_value);
+                journal
+                    .diagnostics
+                    .push(format!("freezer miss for key '{key}', captured new output"));
+            }
+            value
+        });
+    }
+
     engine.register_fn(
         "schedule_after_ms",
-        |_delay_ms: i64, value: Dynamic| -> Dynamic { value },
+        |delay_ms: i64, value: Dynamic| -> Dynamic {
+            if delay_ms <= 0 {
+                return value;
+            }
+
+            let mut wait = Map::new();
+            wait.insert("delayMs".into(), Dynamic::from_int(delay_ms));
+            wait.insert("reason".into(), Dynamic::from("timer"));
+
+            let mut outcome = Map::new();
+            outcome.insert("status".into(), Dynamic::from("wait"));
+            outcome.insert("payload".into(), value);
+            outcome.insert("wait".into(), Dynamic::from(wait));
+            Dynamic::from(outcome)
+        },
     );
+
+    {
+        let journal = Arc::clone(&journal);
+        let fixture_root = fixture_root.clone();
+        engine.register_fn("codex_fixture", move |path: &str| -> Dynamic {
+            let fixture_path = resolve_fixture_path(&fixture_root, path);
+            match fs::read_to_string(&fixture_path)
+                .ok()
+                .and_then(|content| serde_json::from_str::<Value>(&content).ok())
+            {
+                Some(value) => serde_json_to_dynamic(value),
+                None => {
+                    if let Ok(mut journal) = journal.lock() {
+                        journal.fatal_error = Some(format!(
+                            "fixture '{path}' is missing or invalid and recording is disabled"
+                        ));
+                    }
+                    Dynamic::UNIT
+                }
+            }
+        });
+    }
 
     let mut scope = Scope::new();
     scope.push_dynamic("payload", serde_json_to_dynamic(payload));
+    scope.push_dynamic("config", serde_json_to_dynamic(config));
     let output = engine
         .eval_with_scope::<Dynamic>(&mut scope, script)
         .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-    Ok(dynamic_to_json(output))
+    let journal = journal
+        .lock()
+        .map_err(|_| anyhow::anyhow!("node execution journal lock is poisoned"))?
+        .clone();
+    parse_execution_result(output, journal)
 }
 
 pub fn execute_rhai_file(path: &Path, payload: Value) -> anyhow::Result<Value> {
+    let result = execute_rhai_file_with_context(
+        path,
+        payload,
+        Value::Object(Default::default()),
+        &NodeExecutionHost::default(),
+    )?;
+    Ok(result.payload)
+}
+
+pub fn execute_rhai_file_with_context(
+    path: &Path,
+    payload: Value,
+    config: Value,
+    host: &NodeExecutionHost,
+) -> anyhow::Result<NodeExecutionResult> {
     let script = fs::read_to_string(path)
         .with_context(|| format!("failed to read Rhai entrypoint '{}'", path.display()))?;
-    execute_rhai_entrypoint(&script, payload)
+    execute_rhai_entrypoint_with_context(&script, payload, config, host)
 }
 
 fn manifest_to_catalog_entry(manifest: &NodeManifest) -> NodeCatalogEntry {
@@ -390,6 +600,86 @@ fn manifest_to_catalog_entry(manifest: &NodeManifest) -> NodeCatalogEntry {
         input_ports: manifest.input_ports.clone(),
         output_ports: manifest.output_ports.clone(),
     }
+}
+
+fn parse_execution_result(
+    output: Dynamic,
+    journal: NodeExecutionJournal,
+) -> anyhow::Result<NodeExecutionResult> {
+    if let Some(message) = journal.fatal_error.clone() {
+        return Ok(NodeExecutionResult {
+            status: NodeExecutionStatus::Failed,
+            payload: Value::Null,
+            diagnostics: with_message(journal.diagnostics, message),
+            logs: journal.logs,
+            wait: None,
+            cache_writes: journal.cache_writes,
+            freezer_writes: journal.freezer_writes,
+            shell_invocations: journal.shell_invocations,
+            route: None,
+        });
+    }
+
+    let value = dynamic_to_json(output);
+    let Some(object) = value.as_object() else {
+        return Ok(NodeExecutionResult {
+            status: NodeExecutionStatus::Continue,
+            payload: value,
+            route: None,
+            diagnostics: journal.diagnostics,
+            logs: journal.logs,
+            wait: None,
+            cache_writes: journal.cache_writes,
+            freezer_writes: journal.freezer_writes,
+            shell_invocations: journal.shell_invocations,
+        });
+    };
+
+    let status = match object.get("status").and_then(Value::as_str) {
+        Some("wait") => NodeExecutionStatus::Wait,
+        Some("block") => NodeExecutionStatus::Blocked,
+        Some("fail") => NodeExecutionStatus::Failed,
+        Some("complete") => NodeExecutionStatus::Complete,
+        _ => NodeExecutionStatus::Continue,
+    };
+    let payload = object.get("payload").cloned().unwrap_or(value.clone());
+    let route = object
+        .get("route")
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned);
+    let wait = object
+        .get("wait")
+        .and_then(Value::as_object)
+        .map(|wait| NodeWait {
+            delay_ms: wait.get("delayMs").and_then(Value::as_u64),
+            reason: wait
+                .get("reason")
+                .and_then(Value::as_str)
+                .map(ToOwned::to_owned),
+        });
+    let diagnostics = with_messages(
+        journal.diagnostics,
+        object
+            .get("diagnostics")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(ToOwned::to_owned)
+            .collect(),
+    );
+
+    Ok(NodeExecutionResult {
+        status,
+        payload,
+        route,
+        diagnostics,
+        logs: journal.logs,
+        wait,
+        cache_writes: journal.cache_writes,
+        freezer_writes: journal.freezer_writes,
+        shell_invocations: journal.shell_invocations,
+    })
 }
 
 fn validate_ports(
@@ -444,6 +734,25 @@ fn default_output_port_definition() -> NodePortDefinition {
         direction: PortDirection::Output,
         schema_hints: BTreeMap::new(),
         cardinality: PortCardinality::Many,
+    }
+}
+
+fn with_message(mut messages: Vec<String>, message: String) -> Vec<String> {
+    messages.push(message);
+    messages
+}
+
+fn with_messages(mut messages: Vec<String>, additional: Vec<String>) -> Vec<String> {
+    messages.extend(additional);
+    messages
+}
+
+fn resolve_fixture_path(root: &Path, raw_path: &str) -> PathBuf {
+    let path = PathBuf::from(raw_path);
+    if path.is_absolute() {
+        path
+    } else {
+        root.join(path)
     }
 }
 

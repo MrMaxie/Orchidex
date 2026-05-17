@@ -1,8 +1,11 @@
 use crate::models::{
-    default_graph, Graph, IgniteSparkRequest, NodeCatalogResponse, NodeStatus, RuntimeEvent, Spark,
-    SparkStatus,
+    default_graph, default_source_port, Graph, IgniteSparkRequest, NodeCatalogResponse, NodeStatus,
+    RuntimeEvent, Spark, SparkStatus,
 };
-use crate::nodes::{discover_node_catalog, NodeRegistry};
+use crate::nodes::{
+    discover_node_catalog, execute_rhai_file_with_context, NodeExecutionHost, NodeExecutionStatus,
+    NodeRegistry,
+};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
@@ -32,6 +35,8 @@ pub struct RuntimeHandle {
 struct RuntimeState {
     graph: Graph,
     sparks: HashMap<String, Spark>,
+    cache_store: HashMap<String, serde_json::Value>,
+    freezer_store: HashMap<String, serde_json::Value>,
     epoch: u64,
 }
 
@@ -42,6 +47,8 @@ impl RuntimeHandle {
             state: Arc::new(Mutex::new(RuntimeState {
                 graph,
                 sparks: HashMap::new(),
+                cache_store: HashMap::new(),
+                freezer_store: HashMap::new(),
                 epoch: 0,
             })),
             tx,
@@ -187,8 +194,10 @@ impl RuntimeHandle {
     }
 
     fn advance_once(&self, spark_id: &str, epoch: u64) -> Result<AdvanceOutcome, RuntimeError> {
+        let registry = NodeRegistry::load_from(workspace_nodes_dir())
+            .map_err(|error| RuntimeError::NodeRegistry(error.to_string()))?;
         let mut events = Vec::new();
-        let outcome = {
+        let execution = {
             let mut state = self.state.lock().map_err(|_| RuntimeError::LockPoisoned)?;
             if state.epoch != epoch {
                 return Ok(AdvanceOutcome::Finished);
@@ -202,12 +211,13 @@ impl RuntimeHandle {
                 return Ok(AdvanceOutcome::Finished);
             }
 
-            if !state
+            let Some(node) = state
                 .graph
                 .nodes
                 .iter()
-                .any(|node| node.id == current.current_node_id)
-            {
+                .find(|node| node.id == current.current_node_id)
+                .cloned()
+            else {
                 if let Some(spark) = state.sparks.get_mut(spark_id) {
                     spark.status = SparkStatus::Blocked;
                 }
@@ -215,52 +225,176 @@ impl RuntimeHandle {
                     spark_id: spark_id.to_owned(),
                     reason: "current node is missing".to_owned(),
                 });
-                AdvanceOutcome::Finished
-            } else if let Some(edge) = state
-                .graph
-                .edges
-                .iter()
-                .find(|edge| edge.source == current.current_node_id)
-                .cloned()
-            {
-                if !state.graph.nodes.iter().any(|node| node.id == edge.target) {
-                    if let Some(spark) = state.sparks.get_mut(spark_id) {
-                        spark.status = SparkStatus::Blocked;
+                return Ok(AdvanceOutcome::Finished);
+            };
+
+            let host = NodeExecutionHost {
+                cache_entries: state.cache_store.clone().into_iter().collect(),
+                freezer_entries: state.freezer_store.clone().into_iter().collect(),
+                fixture_root: workspace_root_dir(),
+            };
+            (current, node, state.graph.clone(), host)
+        };
+
+        let (current, node, graph, host) = execution;
+        let manifest = registry
+            .get(&node.kind)
+            .ok_or_else(|| RuntimeError::MissingNode(node.kind.clone()))?;
+        let entrypoint_path = registry
+            .entrypoint_path(&node.kind)
+            .ok_or_else(|| RuntimeError::MissingNode(node.kind.clone()))?;
+        let result = execute_rhai_file_with_context(
+            entrypoint_path,
+            current.payload.clone(),
+            node.config.clone(),
+            &host,
+        )
+        .map_err(|error| RuntimeError::InvalidGraph(error.to_string()))?;
+
+        let route_port = result.route.clone().unwrap_or_else(default_source_port);
+        let next_edge = graph
+            .edges
+            .iter()
+            .find(|edge| edge.source == current.current_node_id && edge.source_port == route_port)
+            .cloned();
+
+        let outcome = {
+            let mut state = self.state.lock().map_err(|_| RuntimeError::LockPoisoned)?;
+            if state.epoch != epoch {
+                return Ok(AdvanceOutcome::Finished);
+            }
+            for (key, value) in &result.cache_writes {
+                state.cache_store.insert(key.clone(), value.clone());
+            }
+            for (key, value) in &result.freezer_writes {
+                state.freezer_store.insert(key.clone(), value.clone());
+            }
+            let Some(spark) = state.sparks.get_mut(spark_id) else {
+                return Ok(AdvanceOutcome::Finished);
+            };
+            if spark.status != SparkStatus::Active {
+                return Ok(AdvanceOutcome::Finished);
+            }
+
+            spark.payload = result.payload.clone();
+
+            for message in &result.logs {
+                events.push(RuntimeEvent::Log {
+                    node_id: current.current_node_id.clone(),
+                    message: message.clone(),
+                });
+            }
+            for message in &result.diagnostics {
+                events.push(RuntimeEvent::Log {
+                    node_id: current.current_node_id.clone(),
+                    message: format!("diagnostic: {message}"),
+                });
+            }
+
+            match result.status {
+                NodeExecutionStatus::Continue => {
+                    if let Some(edge) = next_edge {
+                        if !graph.nodes.iter().any(|candidate| candidate.id == edge.target) {
+                            spark.status = SparkStatus::Blocked;
+                            events.push(RuntimeEvent::NodeStatusChanged {
+                                node_id: current.current_node_id.clone(),
+                                status: NodeStatus::Blocked,
+                            });
+                            events.push(RuntimeEvent::SparkBlocked {
+                                spark_id: spark_id.to_owned(),
+                                reason: format!("edge '{}' points to a missing node", edge.id),
+                            });
+                            AdvanceOutcome::Finished
+                        } else {
+                            spark.current_node_id = edge.target.clone();
+                            events.push(RuntimeEvent::NodeStatusChanged {
+                                node_id: current.current_node_id.clone(),
+                                status: NodeStatus::Done,
+                            });
+                            events.push(RuntimeEvent::SparkMoved {
+                                spark_id: spark_id.to_owned(),
+                                from_node_id: current.current_node_id.clone(),
+                                to_node_id: edge.target.clone(),
+                                edge_id: edge.id,
+                            });
+                            events.push(RuntimeEvent::NodeStatusChanged {
+                                node_id: edge.target,
+                                status: NodeStatus::Running,
+                            });
+                            AdvanceOutcome::Continue
+                        }
+                    } else if manifest.output_ports.is_empty() {
+                        spark.status = SparkStatus::Completed;
+                        events.push(RuntimeEvent::NodeStatusChanged {
+                            node_id: current.current_node_id.clone(),
+                            status: NodeStatus::Done,
+                        });
+                        AdvanceOutcome::Finished
+                    } else {
+                        spark.status = SparkStatus::Completed;
+                        events.push(RuntimeEvent::NodeStatusChanged {
+                            node_id: current.current_node_id.clone(),
+                            status: NodeStatus::Done,
+                        });
+                        AdvanceOutcome::Finished
                     }
+                }
+                NodeExecutionStatus::Wait => {
+                    spark.status = SparkStatus::Blocked;
+                    events.push(RuntimeEvent::NodeStatusChanged {
+                        node_id: current.current_node_id.clone(),
+                        status: NodeStatus::Waiting,
+                    });
                     events.push(RuntimeEvent::SparkBlocked {
                         spark_id: spark_id.to_owned(),
-                        reason: format!("edge '{}' points to a missing node", edge.id),
+                        reason: result
+                            .wait
+                            .as_ref()
+                            .and_then(|wait| wait.reason.clone())
+                            .unwrap_or_else(|| "node is waiting".to_owned()),
                     });
                     AdvanceOutcome::Finished
-                } else {
-                    if let Some(spark) = state.sparks.get_mut(spark_id) {
-                        spark.current_node_id = edge.target.clone();
-                    }
+                }
+                NodeExecutionStatus::Blocked => {
+                    spark.status = SparkStatus::Blocked;
+                    events.push(RuntimeEvent::NodeStatusChanged {
+                        node_id: current.current_node_id.clone(),
+                        status: NodeStatus::Blocked,
+                    });
+                    events.push(RuntimeEvent::SparkBlocked {
+                        spark_id: spark_id.to_owned(),
+                        reason: result
+                            .diagnostics
+                            .first()
+                            .cloned()
+                            .unwrap_or_else(|| "node execution blocked".to_owned()),
+                    });
+                    AdvanceOutcome::Finished
+                }
+                NodeExecutionStatus::Failed => {
+                    spark.status = SparkStatus::Blocked;
+                    events.push(RuntimeEvent::NodeStatusChanged {
+                        node_id: current.current_node_id.clone(),
+                        status: NodeStatus::Failed,
+                    });
+                    events.push(RuntimeEvent::SparkBlocked {
+                        spark_id: spark_id.to_owned(),
+                        reason: result
+                            .diagnostics
+                            .first()
+                            .cloned()
+                            .unwrap_or_else(|| "node execution failed".to_owned()),
+                    });
+                    AdvanceOutcome::Finished
+                }
+                NodeExecutionStatus::Complete => {
+                    spark.status = SparkStatus::Completed;
                     events.push(RuntimeEvent::NodeStatusChanged {
                         node_id: current.current_node_id.clone(),
                         status: NodeStatus::Done,
                     });
-                    events.push(RuntimeEvent::SparkMoved {
-                        spark_id: spark_id.to_owned(),
-                        from_node_id: current.current_node_id,
-                        to_node_id: edge.target.clone(),
-                        edge_id: edge.id,
-                    });
-                    events.push(RuntimeEvent::NodeStatusChanged {
-                        node_id: edge.target,
-                        status: NodeStatus::Running,
-                    });
-                    AdvanceOutcome::Continue
+                    AdvanceOutcome::Finished
                 }
-            } else {
-                if let Some(spark) = state.sparks.get_mut(spark_id) {
-                    spark.status = SparkStatus::Completed;
-                }
-                events.push(RuntimeEvent::NodeStatusChanged {
-                    node_id: current.current_node_id,
-                    status: NodeStatus::Done,
-                });
-                AdvanceOutcome::Finished
             }
         };
         self.emit_many(events);
@@ -288,6 +422,13 @@ fn workspace_nodes_dir() -> std::path::PathBuf {
         .parent()
         .expect("core should live in workspace root")
         .join("nodes")
+}
+
+fn workspace_root_dir() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("core should live in workspace root")
+        .to_path_buf()
 }
 
 #[cfg(test)]

@@ -260,7 +260,11 @@ pub fn default_graph() -> Graph {
                 kind: "codex/exec".to_owned(),
                 label: "Select branch".to_owned(),
                 position: GraphPosition { x: 900.0, y: 60.0 },
-                config: serde_json::json!({ "model": "5.3-Codex-Spark", "effort": "medium" }),
+                config: serde_json::json!({
+                    "model": "5.3-Codex-Spark",
+                    "effort": "medium",
+                    "fixture": "examples/fixtures/clients-project/codex-select-branch.json"
+                }),
             },
             GraphNode {
                 id: "codex-plan".to_owned(),
@@ -270,7 +274,11 @@ pub fn default_graph() -> Graph {
                     x: 1200.0,
                     y: 120.0,
                 },
-                config: serde_json::json!({ "model": "5.3", "effort": "high" }),
+                config: serde_json::json!({
+                    "model": "5.3",
+                    "effort": "high",
+                    "fixture": "examples/fixtures/clients-project/codex-split-tasks.json"
+                }),
             },
         ],
         edges: vec![
