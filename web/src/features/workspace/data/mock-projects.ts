@@ -2,24 +2,10 @@ import type { CoreGraph, CoreNodeCatalogEntry } from "@/features/workspace/contr
 import type {
   CatalogNode,
   Project,
-  ProjectGroup,
   WorkflowEdge,
   WorkflowGraphData,
   WorkflowNode,
 } from "@/features/workspace/types";
-
-export const projectGroups: ProjectGroup[] = [
-  {
-    id: "automation",
-    title: "Automation",
-    hint: "Spark-driven project graphs backed by Orchidex Core.",
-  },
-  {
-    id: "debug",
-    title: "Debug",
-    hint: "Fixture graphs and runtime probes.",
-  },
-];
 
 export const fallbackNodeCatalog: CatalogNode[] = [
   node("std/manual-ignite", "Manual Ignite", "Std", "Input", "Starts a spark from user-provided form data."),

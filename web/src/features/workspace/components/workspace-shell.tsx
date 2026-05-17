@@ -1,4 +1,3 @@
-import { projectGroups } from "@/features/workspace/data/mock-projects";
 import { NodeCatalogDialog } from "@/features/workspace/components/catalog/node-catalog-dialog";
 import { DashboardView } from "@/features/workspace/components/dashboard-view";
 import { InspectorPanel } from "@/features/workspace/components/inspector/inspector-panel";
@@ -26,7 +25,6 @@ export function WorkspaceShell({
       <div className="grid h-full grid-cols-[16rem_minmax(0,1fr)_22rem] overflow-hidden bg-[radial-gradient(circle_at_top_left,_color-mix(in_oklch,var(--primary)_18%,transparent),_transparent_28rem),linear-gradient(135deg,_var(--background)_0%,_color-mix(in_oklch,var(--background)_88%,var(--muted))_100%)] max-xl:grid-cols-[15rem_minmax(0,1fr)_20rem] max-lg:h-auto max-lg:min-h-screen max-lg:grid-cols-1 max-lg:overflow-auto">
         <ProjectTree
           activeWorkflowId={workspace.activeWorkflowId}
-          groups={projectGroups}
           isDashboardActive={workspace.isDashboardActive}
           onCreateProject={() =>
             setCreateDialog({ mode: "project", projectId: null })

@@ -56,12 +56,6 @@ export type Project = {
   eventLog: RuntimeEvent[];
 };
 
-export type ProjectGroup = {
-  id: string;
-  title: string;
-  hint: string;
-};
-
 export type CatalogNode = {
   id: string;
   label: string;

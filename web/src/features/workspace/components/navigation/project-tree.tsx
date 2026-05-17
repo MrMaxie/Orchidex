@@ -4,12 +4,11 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { ProjectTreeFolder } from "@/features/workspace/components/navigation/project-tree-folder";
-import type { Project, ProjectGroup } from "@/features/workspace/types";
+import { ProjectTreeFile } from "@/features/workspace/components/navigation/project-tree-file";
+import type { Project } from "@/features/workspace/types";
 
 export function ProjectTree({
   activeWorkflowId,
-  groups,
   isDashboardActive,
   onCreateProject,
   onCreateWorkflow,
@@ -20,7 +19,6 @@ export function ProjectTree({
   selectedProjectId,
 }: {
   activeWorkflowId: string | null;
-  groups: ProjectGroup[];
   isDashboardActive: boolean;
   onCreateProject: () => void;
   onCreateWorkflow: (projectId: string) => void;
@@ -69,18 +67,25 @@ export function ProjectTree({
             <IconDashboard aria-hidden className="shrink-0" size={15} stroke={1.7} />
             <span className="min-w-0 flex-1 truncate">Dashboard</span>
           </button>
-          {groups.map((group) => (
-            <ProjectTreeFolder
-              activeWorkflowId={activeWorkflowId}
-              group={group}
-              key={group.id}
-              onCreateWorkflow={onCreateWorkflow}
-              onProjectSelect={onProjectSelect}
-              onWorkflowSelect={onWorkflowSelect}
-              projects={projects.filter((project) => project.metadata.groupId === group.id)}
-              selectedProjectId={selectedProjectId}
-            />
-          ))}
+          <div className="flex flex-col gap-px pl-4">
+            {projects.length > 0 ? (
+              projects.map((project) => (
+                <ProjectTreeFile
+                  activeWorkflowId={activeWorkflowId}
+                  isActive={project.metadata.id === selectedProjectId}
+                  key={project.metadata.id}
+                  onCreateWorkflow={onCreateWorkflow}
+                  onProjectSelect={onProjectSelect}
+                  onWorkflowSelect={onWorkflowSelect}
+                  project={project}
+                />
+              ))
+            ) : (
+              <p className="px-2 py-1 text-xs text-muted-foreground">
+                No projects
+              </p>
+            )}
+          </div>
         </nav>
       </ScrollArea>
     </aside>
