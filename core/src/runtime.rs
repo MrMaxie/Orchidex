@@ -8,7 +8,7 @@ use crate::nodes::{
     NodeRegistry,
 };
 use crate::runtime_store::RuntimeStore;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
@@ -120,6 +120,7 @@ impl RuntimeHandle {
         }];
         {
             let mut state = self.state.lock().map_err(|_| RuntimeError::LockPoisoned)?;
+            let previous_graph = state.graph.clone();
             state.graph = graph.clone();
             let node_ids: Vec<_> = state
                 .graph
@@ -127,19 +128,97 @@ impl RuntimeHandle {
                 .iter()
                 .map(|node| node.id.clone())
                 .collect();
-            for spark in state.sparks.values_mut() {
-                if spark.status == SparkStatus::Active
-                    && !node_ids
-                        .iter()
-                        .any(|node_id| node_id == &spark.current_node_id)
+            let graph_id = state.graph.id.clone();
+            let mut blocked = Vec::new();
+            for spark in state.sparks.values() {
+                if spark.status != SparkStatus::Active {
+                    continue;
+                }
+
+                if !node_ids
+                    .iter()
+                    .any(|node_id| node_id == &spark.current_node_id)
                 {
-                    spark.status = SparkStatus::Blocked;
-                    events.push(RuntimeEvent::SparkBlocked {
-                        spark_id: spark.id.clone(),
-                        reason: "current node was removed during a live edit".to_owned(),
-                    });
+                    blocked.push((
+                        spark.id.clone(),
+                        spark.current_node_id.clone(),
+                        None,
+                        "current node was removed during a live edit".to_owned(),
+                        "missing-node".to_owned(),
+                    ));
+                    continue;
+                }
+
+                let previous_routes = previous_graph
+                    .edges
+                    .iter()
+                    .filter(|edge| edge.source == spark.current_node_id)
+                    .collect::<Vec<_>>();
+                let removed_route = previous_routes.first().filter(|edge| {
+                    previous_routes.len() == 1
+                        && !state.graph.edges.iter().any(|candidate| {
+                            candidate.id == edge.id
+                                && candidate.source == edge.source
+                                && candidate.source_port == edge.source_port
+                                && candidate.target == edge.target
+                                && candidate.target_port == edge.target_port
+                        })
+                });
+
+                if let Some(edge) = removed_route {
+                    blocked.push((
+                        spark.id.clone(),
+                        spark.current_node_id.clone(),
+                        Some(edge.id.clone()),
+                        format!("route '{}' was removed during a live edit", edge.id),
+                        "missing-route".to_owned(),
+                    ));
                 }
             }
+
+            for (spark_id, node_id, edge_id, reason, kind) in blocked {
+                if let Some(spark) = state.sparks.get_mut(&spark_id) {
+                    spark.status = SparkStatus::Blocked;
+                }
+                let mut context = BTreeMap::new();
+                if let Some(edge_id) = edge_id.clone() {
+                    context.insert("edgeId".to_owned(), serde_json::json!(edge_id));
+                }
+                let diagnostic = RuntimeDiagnostic {
+                    kind,
+                    message: reason.clone(),
+                    graph_id: graph_id.clone(),
+                    spark_id: Some(spark_id.clone()),
+                    node_id: Some(node_id.clone()),
+                    context,
+                };
+                state.diagnostics.push(diagnostic.clone());
+                state.run_history.push(RunHistoryEntry {
+                    spark_id: spark_id.clone(),
+                    graph_id: graph_id.clone(),
+                    final_status: SparkStatus::Blocked,
+                    last_node_id: node_id.clone(),
+                    reason: Some(reason.clone()),
+                });
+                state
+                    .traces
+                    .entry(spark_id.clone())
+                    .or_default()
+                    .push(SparkTraceStep {
+                        spark_id: spark_id.clone(),
+                        node_id,
+                        event: "blocked".to_owned(),
+                        edge_id,
+                        reason: Some(reason.clone()),
+                    });
+                events.push(RuntimeEvent::SparkBlocked {
+                    spark_id: spark_id.clone(),
+                    reason: reason.clone(),
+                });
+                events.push(RuntimeEvent::DiagnosticRecorded { diagnostic });
+            }
+
+            self.persist_state(&state)?;
         }
         self.emit_many(events);
         Ok(graph)
@@ -166,6 +245,7 @@ impl RuntimeHandle {
             };
             let epoch = state.epoch;
             state.sparks.insert(spark.id.clone(), spark.clone());
+            self.persist_state(&state)?;
             (spark, epoch)
         };
 
@@ -201,6 +281,7 @@ impl RuntimeHandle {
                     });
                 }
             }
+            self.persist_state(&state)?;
         }
         events.push(RuntimeEvent::AllSparksExtinguished);
         self.emit_many(events);
@@ -248,7 +329,10 @@ impl RuntimeHandle {
         Ok(released_ids.len())
     }
 
-    pub fn resolve_manual_gate(&self, request: ResolveManualGateRequest) -> Result<Spark, RuntimeError> {
+    pub fn resolve_manual_gate(
+        &self,
+        request: ResolveManualGateRequest,
+    ) -> Result<Spark, RuntimeError> {
         let (spark, epoch) = {
             let mut state = self.state.lock().map_err(|_| RuntimeError::LockPoisoned)?;
             let graph_id = state.graph.id.clone();
@@ -457,368 +541,368 @@ impl RuntimeHandle {
             .find(|edge| edge.source == current.current_node_id && edge.source_port == route_port)
             .cloned();
 
-        let outcome = {
-            let mut state = self.state.lock().map_err(|_| RuntimeError::LockPoisoned)?;
-            if state.epoch != epoch {
-                return Ok(AdvanceOutcome::Finished);
-            }
-            for (key, value) in &result.cache_writes {
-                state.cache_store.insert(key.clone(), value.clone());
-            }
-            for (key, value) in &result.freezer_writes {
-                state.freezer_store.insert(key.clone(), value.clone());
-            }
-            let graph_id = graph.id.clone();
-            for message in &result.diagnostics {
-                state.diagnostics.push(RuntimeDiagnostic {
-                    kind: "node-diagnostic".to_owned(),
-                    message: message.clone(),
-                    graph_id: graph_id.clone(),
-                    spark_id: Some(spark_id.to_owned()),
-                    node_id: Some(current.current_node_id.clone()),
-                    context: Default::default(),
-                });
-                events.push(RuntimeEvent::DiagnosticRecorded {
-                    diagnostic: RuntimeDiagnostic {
+        let outcome =
+            {
+                let mut state = self.state.lock().map_err(|_| RuntimeError::LockPoisoned)?;
+                if state.epoch != epoch {
+                    return Ok(AdvanceOutcome::Finished);
+                }
+                for (key, value) in &result.cache_writes {
+                    state.cache_store.insert(key.clone(), value.clone());
+                }
+                for (key, value) in &result.freezer_writes {
+                    state.freezer_store.insert(key.clone(), value.clone());
+                }
+                let graph_id = graph.id.clone();
+                for message in &result.diagnostics {
+                    state.diagnostics.push(RuntimeDiagnostic {
                         kind: "node-diagnostic".to_owned(),
                         message: message.clone(),
                         graph_id: graph_id.clone(),
                         spark_id: Some(spark_id.to_owned()),
                         node_id: Some(current.current_node_id.clone()),
                         context: Default::default(),
-                    },
-                });
-            }
-            let Some(mut spark) = state.sparks.remove(spark_id) else {
-                return Ok(AdvanceOutcome::Finished);
-            };
-            if spark.status != SparkStatus::Active {
-                state.sparks.insert(spark.id.clone(), spark);
-                return Ok(AdvanceOutcome::Finished);
-            }
+                    });
+                    events.push(RuntimeEvent::DiagnosticRecorded {
+                        diagnostic: RuntimeDiagnostic {
+                            kind: "node-diagnostic".to_owned(),
+                            message: message.clone(),
+                            graph_id: graph_id.clone(),
+                            spark_id: Some(spark_id.to_owned()),
+                            node_id: Some(current.current_node_id.clone()),
+                            context: Default::default(),
+                        },
+                    });
+                }
+                let Some(mut spark) = state.sparks.remove(spark_id) else {
+                    return Ok(AdvanceOutcome::Finished);
+                };
+                if spark.status != SparkStatus::Active {
+                    state.sparks.insert(spark.id.clone(), spark);
+                    return Ok(AdvanceOutcome::Finished);
+                }
 
-            spark.payload = result.payload.clone();
+                spark.payload = result.payload.clone();
 
-            for message in &result.logs {
-                events.push(RuntimeEvent::Log {
-                    node_id: current.current_node_id.clone(),
-                    message: message.clone(),
-                });
-            }
-            for message in &result.diagnostics {
-                events.push(RuntimeEvent::Log {
-                    node_id: current.current_node_id.clone(),
-                    message: format!("diagnostic: {message}"),
-                });
-            }
+                for message in &result.logs {
+                    events.push(RuntimeEvent::Log {
+                        node_id: current.current_node_id.clone(),
+                        message: message.clone(),
+                    });
+                }
+                for message in &result.diagnostics {
+                    events.push(RuntimeEvent::Log {
+                        node_id: current.current_node_id.clone(),
+                        message: format!("diagnostic: {message}"),
+                    });
+                }
 
-            match result.status {
-                NodeExecutionStatus::Continue => {
-                    if let Some(edge) = next_edge {
-                        if !graph.nodes.iter().any(|candidate| candidate.id == edge.target) {
-                            spark.status = SparkStatus::Blocked;
+                match result.status {
+                    NodeExecutionStatus::Continue => {
+                        if let Some(edge) = next_edge {
+                            if !graph
+                                .nodes
+                                .iter()
+                                .any(|candidate| candidate.id == edge.target)
+                            {
+                                spark.status = SparkStatus::Blocked;
+                                state.run_history.push(RunHistoryEntry {
+                                    spark_id: spark_id.to_owned(),
+                                    graph_id: graph.id.clone(),
+                                    final_status: SparkStatus::Blocked,
+                                    last_node_id: current.current_node_id.clone(),
+                                    reason: Some(format!(
+                                        "edge '{}' points to a missing node",
+                                        edge.id
+                                    )),
+                                });
+                                events.push(RuntimeEvent::NodeStatusChanged {
+                                    node_id: current.current_node_id.clone(),
+                                    status: NodeStatus::Blocked,
+                                });
+                                events.push(RuntimeEvent::SparkBlocked {
+                                    spark_id: spark_id.to_owned(),
+                                    reason: format!("edge '{}' points to a missing node", edge.id),
+                                });
+                                events.push(RuntimeEvent::SparkFailed {
+                                    spark_id: spark_id.to_owned(),
+                                    node_id: current.current_node_id.clone(),
+                                    reason: format!("edge '{}' points to a missing node", edge.id),
+                                });
+                                state.traces.entry(spark_id.to_owned()).or_default().push(
+                                    SparkTraceStep {
+                                        spark_id: spark_id.to_owned(),
+                                        node_id: current.current_node_id.clone(),
+                                        event: "blocked".to_owned(),
+                                        edge_id: Some(edge.id),
+                                        reason: Some("missing target node".to_owned()),
+                                    },
+                                );
+                                state.sparks.insert(spark.id.clone(), spark);
+                                self.persist_state(&state)?;
+                                AdvanceOutcome::Finished
+                            } else {
+                                spark.current_node_id = edge.target.clone();
+                                events.push(RuntimeEvent::NodeStatusChanged {
+                                    node_id: current.current_node_id.clone(),
+                                    status: NodeStatus::Done,
+                                });
+                                events.push(RuntimeEvent::SparkMoved {
+                                    spark_id: spark_id.to_owned(),
+                                    from_node_id: current.current_node_id.clone(),
+                                    to_node_id: edge.target.clone(),
+                                    edge_id: edge.id.clone(),
+                                });
+                                events.push(RuntimeEvent::NodeStatusChanged {
+                                    node_id: edge.target,
+                                    status: NodeStatus::Running,
+                                });
+                                state.traces.entry(spark_id.to_owned()).or_default().push(
+                                    SparkTraceStep {
+                                        spark_id: spark_id.to_owned(),
+                                        node_id: current.current_node_id.clone(),
+                                        event: "moved".to_owned(),
+                                        edge_id: Some(edge.id),
+                                        reason: None,
+                                    },
+                                );
+                                state.sparks.insert(spark.id.clone(), spark);
+                                self.persist_state(&state)?;
+                                AdvanceOutcome::Continue
+                            }
+                        } else if manifest.output_ports.is_empty() {
+                            spark.status = SparkStatus::Completed;
                             state.run_history.push(RunHistoryEntry {
                                 spark_id: spark_id.to_owned(),
                                 graph_id: graph.id.clone(),
-                                final_status: SparkStatus::Blocked,
+                                final_status: SparkStatus::Completed,
                                 last_node_id: current.current_node_id.clone(),
-                                reason: Some(format!("edge '{}' points to a missing node", edge.id)),
+                                reason: Some("node completed without outputs".to_owned()),
                             });
-                            events.push(RuntimeEvent::NodeStatusChanged {
-                                node_id: current.current_node_id.clone(),
-                                status: NodeStatus::Blocked,
-                            });
-                            events.push(RuntimeEvent::SparkBlocked {
-                                spark_id: spark_id.to_owned(),
-                                reason: format!("edge '{}' points to a missing node", edge.id),
-                            });
-                            events.push(RuntimeEvent::SparkFailed {
-                                spark_id: spark_id.to_owned(),
-                                node_id: current.current_node_id.clone(),
-                                reason: format!("edge '{}' points to a missing node", edge.id),
-                            });
-                            state
-                                .traces
-                                .entry(spark_id.to_owned())
-                                .or_default()
-                                .push(SparkTraceStep {
-                                    spark_id: spark_id.to_owned(),
-                                    node_id: current.current_node_id.clone(),
-                                    event: "blocked".to_owned(),
-                                    edge_id: Some(edge.id),
-                                    reason: Some("missing target node".to_owned()),
-                                });
-                            state.sparks.insert(spark.id.clone(), spark);
-                            self.persist_state(&state)?;
-                            AdvanceOutcome::Finished
-                        } else {
-                            spark.current_node_id = edge.target.clone();
                             events.push(RuntimeEvent::NodeStatusChanged {
                                 node_id: current.current_node_id.clone(),
                                 status: NodeStatus::Done,
                             });
-                            events.push(RuntimeEvent::SparkMoved {
-                                spark_id: spark_id.to_owned(),
-                                from_node_id: current.current_node_id.clone(),
-                                to_node_id: edge.target.clone(),
-                                edge_id: edge.id.clone(),
-                            });
-                            events.push(RuntimeEvent::NodeStatusChanged {
-                                node_id: edge.target,
-                                status: NodeStatus::Running,
-                            });
-                            state
-                                .traces
-                                .entry(spark_id.to_owned())
-                                .or_default()
-                                .push(SparkTraceStep {
+                            state.traces.entry(spark_id.to_owned()).or_default().push(
+                                SparkTraceStep {
                                     spark_id: spark_id.to_owned(),
                                     node_id: current.current_node_id.clone(),
-                                    event: "moved".to_owned(),
-                                    edge_id: Some(edge.id),
-                                    reason: None,
-                                });
+                                    event: "completed".to_owned(),
+                                    edge_id: None,
+                                    reason: Some("node completed without outputs".to_owned()),
+                                },
+                            );
                             state.sparks.insert(spark.id.clone(), spark);
                             self.persist_state(&state)?;
-                            AdvanceOutcome::Continue
-                        }
-                    } else if manifest.output_ports.is_empty() {
-                        spark.status = SparkStatus::Completed;
-                        state.run_history.push(RunHistoryEntry {
-                            spark_id: spark_id.to_owned(),
-                            graph_id: graph.id.clone(),
-                            final_status: SparkStatus::Completed,
-                            last_node_id: current.current_node_id.clone(),
-                            reason: Some("node completed without outputs".to_owned()),
-                        });
-                        events.push(RuntimeEvent::NodeStatusChanged {
-                            node_id: current.current_node_id.clone(),
-                            status: NodeStatus::Done,
-                        });
-                        state
-                            .traces
-                            .entry(spark_id.to_owned())
-                            .or_default()
-                            .push(SparkTraceStep {
+                            AdvanceOutcome::Finished
+                        } else {
+                            spark.status = SparkStatus::Completed;
+                            state.run_history.push(RunHistoryEntry {
                                 spark_id: spark_id.to_owned(),
-                                node_id: current.current_node_id.clone(),
-                                event: "completed".to_owned(),
-                                edge_id: None,
-                                reason: Some("node completed without outputs".to_owned()),
-                            });
-                        state.sparks.insert(spark.id.clone(), spark);
-                        self.persist_state(&state)?;
-                        AdvanceOutcome::Finished
-                    } else {
-                        spark.status = SparkStatus::Completed;
-                        state.run_history.push(RunHistoryEntry {
-                            spark_id: spark_id.to_owned(),
-                            graph_id: graph.id.clone(),
-                            final_status: SparkStatus::Completed,
-                            last_node_id: current.current_node_id.clone(),
-                            reason: Some("no matching outgoing route".to_owned()),
-                        });
-                        events.push(RuntimeEvent::NodeStatusChanged {
-                            node_id: current.current_node_id.clone(),
-                            status: NodeStatus::Done,
-                        });
-                        state
-                            .traces
-                            .entry(spark_id.to_owned())
-                            .or_default()
-                            .push(SparkTraceStep {
-                                spark_id: spark_id.to_owned(),
-                                node_id: current.current_node_id.clone(),
-                                event: "completed".to_owned(),
-                                edge_id: None,
+                                graph_id: graph.id.clone(),
+                                final_status: SparkStatus::Completed,
+                                last_node_id: current.current_node_id.clone(),
                                 reason: Some("no matching outgoing route".to_owned()),
                             });
+                            events.push(RuntimeEvent::NodeStatusChanged {
+                                node_id: current.current_node_id.clone(),
+                                status: NodeStatus::Done,
+                            });
+                            state.traces.entry(spark_id.to_owned()).or_default().push(
+                                SparkTraceStep {
+                                    spark_id: spark_id.to_owned(),
+                                    node_id: current.current_node_id.clone(),
+                                    event: "completed".to_owned(),
+                                    edge_id: None,
+                                    reason: Some("no matching outgoing route".to_owned()),
+                                },
+                            );
+                            state.sparks.insert(spark.id.clone(), spark);
+                            self.persist_state(&state)?;
+                            AdvanceOutcome::Finished
+                        }
+                    }
+                    NodeExecutionStatus::Wait => {
+                        spark.status = SparkStatus::Blocked;
+                        let wait_reason = result
+                            .wait
+                            .as_ref()
+                            .and_then(|wait| wait.reason.clone())
+                            .unwrap_or_else(|| "node is waiting".to_owned());
+                        state.run_history.push(RunHistoryEntry {
+                            spark_id: spark_id.to_owned(),
+                            graph_id: graph.id.clone(),
+                            final_status: SparkStatus::Blocked,
+                            last_node_id: current.current_node_id.clone(),
+                            reason: Some(wait_reason.clone()),
+                        });
+                        events.push(RuntimeEvent::NodeStatusChanged {
+                            node_id: current.current_node_id.clone(),
+                            status: NodeStatus::Waiting,
+                        });
+                        events.push(RuntimeEvent::SparkBlocked {
+                            spark_id: spark_id.to_owned(),
+                            reason: wait_reason.clone(),
+                        });
+                        events.push(RuntimeEvent::SparkWaiting {
+                            spark_id: spark_id.to_owned(),
+                            node_id: current.current_node_id.clone(),
+                            reason: wait_reason.clone(),
+                            resolution: if node.kind == "std/manual-accept" {
+                                "manual-resolution".to_owned()
+                            } else if node.kind == "std/accumulation" {
+                                "queue-release".to_owned()
+                            } else {
+                                "timer".to_owned()
+                            },
+                        });
+                        if node.kind == "std/manual-accept" {
+                            events.push(RuntimeEvent::ManualGateChanged {
+                                spark_id: spark_id.to_owned(),
+                                node_id: current.current_node_id.clone(),
+                                resolved: false,
+                            });
+                        }
+                        if node.kind == "std/accumulation" {
+                            events.push(RuntimeEvent::QueueChanged {
+                                node_id: current.current_node_id.clone(),
+                                released: false,
+                            });
+                        }
+                        state
+                            .traces
+                            .entry(spark_id.to_owned())
+                            .or_default()
+                            .push(SparkTraceStep {
+                                spark_id: spark_id.to_owned(),
+                                node_id: current.current_node_id.clone(),
+                                event: "waiting".to_owned(),
+                                edge_id: None,
+                                reason: Some(wait_reason),
+                            });
+                        state.sparks.insert(spark.id.clone(), spark);
+                        self.persist_state(&state)?;
+                        AdvanceOutcome::Finished
+                    }
+                    NodeExecutionStatus::Blocked => {
+                        spark.status = SparkStatus::Blocked;
+                        let block_reason = result
+                            .diagnostics
+                            .first()
+                            .cloned()
+                            .unwrap_or_else(|| "node execution blocked".to_owned());
+                        state.run_history.push(RunHistoryEntry {
+                            spark_id: spark_id.to_owned(),
+                            graph_id: graph.id.clone(),
+                            final_status: SparkStatus::Blocked,
+                            last_node_id: current.current_node_id.clone(),
+                            reason: Some(block_reason.clone()),
+                        });
+                        events.push(RuntimeEvent::NodeStatusChanged {
+                            node_id: current.current_node_id.clone(),
+                            status: NodeStatus::Blocked,
+                        });
+                        events.push(RuntimeEvent::SparkBlocked {
+                            spark_id: spark_id.to_owned(),
+                            reason: block_reason.clone(),
+                        });
+                        events.push(RuntimeEvent::SparkFailed {
+                            spark_id: spark_id.to_owned(),
+                            node_id: current.current_node_id.clone(),
+                            reason: block_reason.clone(),
+                        });
+                        state
+                            .traces
+                            .entry(spark_id.to_owned())
+                            .or_default()
+                            .push(SparkTraceStep {
+                                spark_id: spark_id.to_owned(),
+                                node_id: current.current_node_id.clone(),
+                                event: "blocked".to_owned(),
+                                edge_id: None,
+                                reason: Some(block_reason),
+                            });
+                        state.sparks.insert(spark.id.clone(), spark);
+                        self.persist_state(&state)?;
+                        AdvanceOutcome::Finished
+                    }
+                    NodeExecutionStatus::Failed => {
+                        spark.status = SparkStatus::Blocked;
+                        let failure_reason = result
+                            .diagnostics
+                            .first()
+                            .cloned()
+                            .unwrap_or_else(|| "node execution failed".to_owned());
+                        state.run_history.push(RunHistoryEntry {
+                            spark_id: spark_id.to_owned(),
+                            graph_id: graph.id.clone(),
+                            final_status: SparkStatus::Blocked,
+                            last_node_id: current.current_node_id.clone(),
+                            reason: Some(failure_reason.clone()),
+                        });
+                        events.push(RuntimeEvent::NodeStatusChanged {
+                            node_id: current.current_node_id.clone(),
+                            status: NodeStatus::Failed,
+                        });
+                        events.push(RuntimeEvent::SparkBlocked {
+                            spark_id: spark_id.to_owned(),
+                            reason: failure_reason.clone(),
+                        });
+                        events.push(RuntimeEvent::SparkFailed {
+                            spark_id: spark_id.to_owned(),
+                            node_id: current.current_node_id.clone(),
+                            reason: failure_reason.clone(),
+                        });
+                        state
+                            .traces
+                            .entry(spark_id.to_owned())
+                            .or_default()
+                            .push(SparkTraceStep {
+                                spark_id: spark_id.to_owned(),
+                                node_id: current.current_node_id.clone(),
+                                event: "failed".to_owned(),
+                                edge_id: None,
+                                reason: Some(failure_reason),
+                            });
+                        state.sparks.insert(spark.id.clone(), spark);
+                        self.persist_state(&state)?;
+                        AdvanceOutcome::Finished
+                    }
+                    NodeExecutionStatus::Complete => {
+                        spark.status = SparkStatus::Completed;
+                        state.run_history.push(RunHistoryEntry {
+                            spark_id: spark_id.to_owned(),
+                            graph_id: graph.id.clone(),
+                            final_status: SparkStatus::Completed,
+                            last_node_id: current.current_node_id.clone(),
+                            reason: Some("node requested completion".to_owned()),
+                        });
+                        events.push(RuntimeEvent::NodeStatusChanged {
+                            node_id: current.current_node_id.clone(),
+                            status: NodeStatus::Done,
+                        });
+                        events.push(RuntimeEvent::SparkCompleted {
+                            spark_id: spark_id.to_owned(),
+                            node_id: current.current_node_id.clone(),
+                            reason: "node requested completion".to_owned(),
+                        });
+                        state
+                            .traces
+                            .entry(spark_id.to_owned())
+                            .or_default()
+                            .push(SparkTraceStep {
+                                spark_id: spark_id.to_owned(),
+                                node_id: current.current_node_id.clone(),
+                                event: "completed".to_owned(),
+                                edge_id: None,
+                                reason: Some("node requested completion".to_owned()),
+                            });
                         state.sparks.insert(spark.id.clone(), spark);
                         self.persist_state(&state)?;
                         AdvanceOutcome::Finished
                     }
                 }
-                NodeExecutionStatus::Wait => {
-                    spark.status = SparkStatus::Blocked;
-                    let wait_reason = result
-                        .wait
-                        .as_ref()
-                        .and_then(|wait| wait.reason.clone())
-                        .unwrap_or_else(|| "node is waiting".to_owned());
-                    state.run_history.push(RunHistoryEntry {
-                        spark_id: spark_id.to_owned(),
-                        graph_id: graph.id.clone(),
-                        final_status: SparkStatus::Blocked,
-                        last_node_id: current.current_node_id.clone(),
-                        reason: Some(wait_reason.clone()),
-                    });
-                    events.push(RuntimeEvent::NodeStatusChanged {
-                        node_id: current.current_node_id.clone(),
-                        status: NodeStatus::Waiting,
-                    });
-                    events.push(RuntimeEvent::SparkBlocked {
-                        spark_id: spark_id.to_owned(),
-                        reason: wait_reason.clone(),
-                    });
-                    events.push(RuntimeEvent::SparkWaiting {
-                        spark_id: spark_id.to_owned(),
-                        node_id: current.current_node_id.clone(),
-                        reason: wait_reason.clone(),
-                        resolution: if node.kind == "std/manual-accept" {
-                            "manual-resolution".to_owned()
-                        } else if node.kind == "std/accumulation" {
-                            "queue-release".to_owned()
-                        } else {
-                            "timer".to_owned()
-                        },
-                    });
-                    if node.kind == "std/manual-accept" {
-                        events.push(RuntimeEvent::ManualGateChanged {
-                            spark_id: spark_id.to_owned(),
-                            node_id: current.current_node_id.clone(),
-                            resolved: false,
-                        });
-                    }
-                    if node.kind == "std/accumulation" {
-                        events.push(RuntimeEvent::QueueChanged {
-                            node_id: current.current_node_id.clone(),
-                            released: false,
-                        });
-                    }
-                    state
-                        .traces
-                        .entry(spark_id.to_owned())
-                        .or_default()
-                        .push(SparkTraceStep {
-                            spark_id: spark_id.to_owned(),
-                            node_id: current.current_node_id.clone(),
-                            event: "waiting".to_owned(),
-                            edge_id: None,
-                            reason: Some(wait_reason),
-                        });
-                    state.sparks.insert(spark.id.clone(), spark);
-                    self.persist_state(&state)?;
-                    AdvanceOutcome::Finished
-                }
-                NodeExecutionStatus::Blocked => {
-                    spark.status = SparkStatus::Blocked;
-                    let block_reason = result
-                        .diagnostics
-                        .first()
-                        .cloned()
-                        .unwrap_or_else(|| "node execution blocked".to_owned());
-                    state.run_history.push(RunHistoryEntry {
-                        spark_id: spark_id.to_owned(),
-                        graph_id: graph.id.clone(),
-                        final_status: SparkStatus::Blocked,
-                        last_node_id: current.current_node_id.clone(),
-                        reason: Some(block_reason.clone()),
-                    });
-                    events.push(RuntimeEvent::NodeStatusChanged {
-                        node_id: current.current_node_id.clone(),
-                        status: NodeStatus::Blocked,
-                    });
-                    events.push(RuntimeEvent::SparkBlocked {
-                        spark_id: spark_id.to_owned(),
-                        reason: block_reason.clone(),
-                    });
-                    events.push(RuntimeEvent::SparkFailed {
-                        spark_id: spark_id.to_owned(),
-                        node_id: current.current_node_id.clone(),
-                        reason: block_reason.clone(),
-                    });
-                    state
-                        .traces
-                        .entry(spark_id.to_owned())
-                        .or_default()
-                        .push(SparkTraceStep {
-                            spark_id: spark_id.to_owned(),
-                            node_id: current.current_node_id.clone(),
-                            event: "blocked".to_owned(),
-                            edge_id: None,
-                            reason: Some(block_reason),
-                        });
-                    state.sparks.insert(spark.id.clone(), spark);
-                    self.persist_state(&state)?;
-                    AdvanceOutcome::Finished
-                }
-                NodeExecutionStatus::Failed => {
-                    spark.status = SparkStatus::Blocked;
-                    let failure_reason = result
-                        .diagnostics
-                        .first()
-                        .cloned()
-                        .unwrap_or_else(|| "node execution failed".to_owned());
-                    state.run_history.push(RunHistoryEntry {
-                        spark_id: spark_id.to_owned(),
-                        graph_id: graph.id.clone(),
-                        final_status: SparkStatus::Blocked,
-                        last_node_id: current.current_node_id.clone(),
-                        reason: Some(failure_reason.clone()),
-                    });
-                    events.push(RuntimeEvent::NodeStatusChanged {
-                        node_id: current.current_node_id.clone(),
-                        status: NodeStatus::Failed,
-                    });
-                    events.push(RuntimeEvent::SparkBlocked {
-                        spark_id: spark_id.to_owned(),
-                        reason: failure_reason.clone(),
-                    });
-                    events.push(RuntimeEvent::SparkFailed {
-                        spark_id: spark_id.to_owned(),
-                        node_id: current.current_node_id.clone(),
-                        reason: failure_reason.clone(),
-                    });
-                    state
-                        .traces
-                        .entry(spark_id.to_owned())
-                        .or_default()
-                        .push(SparkTraceStep {
-                            spark_id: spark_id.to_owned(),
-                            node_id: current.current_node_id.clone(),
-                            event: "failed".to_owned(),
-                            edge_id: None,
-                            reason: Some(failure_reason),
-                        });
-                    state.sparks.insert(spark.id.clone(), spark);
-                    self.persist_state(&state)?;
-                    AdvanceOutcome::Finished
-                }
-                NodeExecutionStatus::Complete => {
-                    spark.status = SparkStatus::Completed;
-                    state.run_history.push(RunHistoryEntry {
-                        spark_id: spark_id.to_owned(),
-                        graph_id: graph.id.clone(),
-                        final_status: SparkStatus::Completed,
-                        last_node_id: current.current_node_id.clone(),
-                        reason: Some("node requested completion".to_owned()),
-                    });
-                    events.push(RuntimeEvent::NodeStatusChanged {
-                        node_id: current.current_node_id.clone(),
-                        status: NodeStatus::Done,
-                    });
-                    events.push(RuntimeEvent::SparkCompleted {
-                        spark_id: spark_id.to_owned(),
-                        node_id: current.current_node_id.clone(),
-                        reason: "node requested completion".to_owned(),
-                    });
-                    state
-                        .traces
-                        .entry(spark_id.to_owned())
-                        .or_default()
-                        .push(SparkTraceStep {
-                            spark_id: spark_id.to_owned(),
-                            node_id: current.current_node_id.clone(),
-                            event: "completed".to_owned(),
-                            edge_id: None,
-                            reason: Some("node requested completion".to_owned()),
-                        });
-                    state.sparks.insert(spark.id.clone(), spark);
-                    self.persist_state(&state)?;
-                    AdvanceOutcome::Finished
-                }
-            }
-        };
+            };
         self.emit_many(events);
         Ok(outcome)
     }
@@ -952,6 +1036,219 @@ mod tests {
         assert!(saw_blocked);
     }
 
+    #[tokio::test]
+    async fn marks_spark_blocked_when_live_edit_removes_active_route() {
+        let runtime = test_runtime(Graph {
+            id: "test".to_owned(),
+            name: "Test".to_owned(),
+            nodes: vec![
+                GraphNode {
+                    id: "a".to_owned(),
+                    kind: "debug/placeholder-echo".to_owned(),
+                    label: "A".to_owned(),
+                    position: GraphPosition { x: 0.0, y: 0.0 },
+                    config: serde_json::json!({}),
+                },
+                GraphNode {
+                    id: "b".to_owned(),
+                    kind: "debug/placeholder-echo".to_owned(),
+                    label: "B".to_owned(),
+                    position: GraphPosition { x: 100.0, y: 0.0 },
+                    config: serde_json::json!({}),
+                },
+            ],
+            edges: vec![GraphEdge {
+                id: "a-b".to_owned(),
+                source: "a".to_owned(),
+                source_port: "out".to_owned(),
+                target: "b".to_owned(),
+                target_port: "in".to_owned(),
+                label: None,
+            }],
+        });
+        let spark = runtime
+            .ignite(IgniteSparkRequest {
+                node_id: "a".to_owned(),
+                payload: serde_json::json!({}),
+            })
+            .expect("spark should ignite");
+
+        runtime
+            .replace_graph(Graph {
+                id: "test".to_owned(),
+                name: "Test".to_owned(),
+                nodes: vec![
+                    GraphNode {
+                        id: "a".to_owned(),
+                        kind: "debug/placeholder-echo".to_owned(),
+                        label: "A".to_owned(),
+                        position: GraphPosition { x: 0.0, y: 0.0 },
+                        config: serde_json::json!({}),
+                    },
+                    GraphNode {
+                        id: "b".to_owned(),
+                        kind: "debug/placeholder-echo".to_owned(),
+                        label: "B".to_owned(),
+                        position: GraphPosition { x: 100.0, y: 0.0 },
+                        config: serde_json::json!({}),
+                    },
+                ],
+                edges: vec![],
+            })
+            .expect("graph replacement should work");
+
+        let diagnostics = runtime.diagnostics().expect("diagnostics should load");
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.kind == "missing-route" && diagnostic.spark_id.as_deref() == Some(&spark.id)
+        }));
+        let history = runtime.run_history().expect("history should load");
+        assert!(history.iter().any(|entry| {
+            entry.spark_id == spark.id
+                && entry.final_status == SparkStatus::Blocked
+                && entry.reason.as_deref() == Some("route 'a-b' was removed during a live edit")
+        }));
+    }
+
+    #[tokio::test]
+    async fn does_not_preemptively_block_when_live_edit_removes_one_of_many_routes() {
+        let runtime = test_runtime(Graph {
+            id: "test".to_owned(),
+            name: "Test".to_owned(),
+            nodes: vec![
+                GraphNode {
+                    id: "a".to_owned(),
+                    kind: "debug/placeholder-echo".to_owned(),
+                    label: "A".to_owned(),
+                    position: GraphPosition { x: 0.0, y: 0.0 },
+                    config: serde_json::json!({}),
+                },
+                GraphNode {
+                    id: "b".to_owned(),
+                    kind: "debug/placeholder-echo".to_owned(),
+                    label: "B".to_owned(),
+                    position: GraphPosition { x: 100.0, y: 0.0 },
+                    config: serde_json::json!({}),
+                },
+                GraphNode {
+                    id: "c".to_owned(),
+                    kind: "debug/placeholder-echo".to_owned(),
+                    label: "C".to_owned(),
+                    position: GraphPosition { x: 100.0, y: 80.0 },
+                    config: serde_json::json!({}),
+                },
+            ],
+            edges: vec![
+                GraphEdge {
+                    id: "a-b".to_owned(),
+                    source: "a".to_owned(),
+                    source_port: "out".to_owned(),
+                    target: "b".to_owned(),
+                    target_port: "in".to_owned(),
+                    label: None,
+                },
+                GraphEdge {
+                    id: "a-c".to_owned(),
+                    source: "a".to_owned(),
+                    source_port: "out".to_owned(),
+                    target: "c".to_owned(),
+                    target_port: "in".to_owned(),
+                    label: None,
+                },
+            ],
+        });
+        let spark = runtime
+            .ignite(IgniteSparkRequest {
+                node_id: "a".to_owned(),
+                payload: serde_json::json!({}),
+            })
+            .expect("spark should ignite");
+
+        runtime
+            .replace_graph(Graph {
+                id: "test".to_owned(),
+                name: "Test".to_owned(),
+                nodes: vec![
+                    GraphNode {
+                        id: "a".to_owned(),
+                        kind: "debug/placeholder-echo".to_owned(),
+                        label: "A".to_owned(),
+                        position: GraphPosition { x: 0.0, y: 0.0 },
+                        config: serde_json::json!({}),
+                    },
+                    GraphNode {
+                        id: "b".to_owned(),
+                        kind: "debug/placeholder-echo".to_owned(),
+                        label: "B".to_owned(),
+                        position: GraphPosition { x: 100.0, y: 0.0 },
+                        config: serde_json::json!({}),
+                    },
+                    GraphNode {
+                        id: "c".to_owned(),
+                        kind: "debug/placeholder-echo".to_owned(),
+                        label: "C".to_owned(),
+                        position: GraphPosition { x: 100.0, y: 80.0 },
+                        config: serde_json::json!({}),
+                    },
+                ],
+                edges: vec![GraphEdge {
+                    id: "a-c".to_owned(),
+                    source: "a".to_owned(),
+                    source_port: "out".to_owned(),
+                    target: "c".to_owned(),
+                    target_port: "in".to_owned(),
+                    label: None,
+                }],
+            })
+            .expect("graph replacement should work");
+
+        let snapshot = runtime
+            .store
+            .load_snapshot()
+            .expect("snapshot should be readable")
+            .expect("snapshot should exist");
+        let stored = snapshot
+            .active_sparks
+            .iter()
+            .find(|candidate| candidate.id == spark.id)
+            .expect("spark should remain tracked");
+        assert_eq!(stored.status, SparkStatus::Active);
+        assert!(!runtime
+            .diagnostics()
+            .expect("diagnostics should load")
+            .iter()
+            .any(|diagnostic| {
+                diagnostic.kind == "missing-route"
+                    && diagnostic.spark_id.as_deref() == Some(&spark.id)
+            },));
+    }
+
+    #[tokio::test]
+    async fn persists_ignited_spark_snapshot() {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be available")
+            .as_nanos();
+        let store_path = std::env::temp_dir().join(format!("orchidex-runtime-ignite-{suffix}"));
+        let store = RuntimeStore::new(store_path.clone());
+        let runtime = RuntimeHandle::with_store(default_graph(), store.clone());
+        let spark = runtime
+            .ignite(IgniteSparkRequest {
+                node_id: "manual-start".to_owned(),
+                payload: serde_json::json!({ "source": "test" }),
+            })
+            .expect("spark should ignite");
+
+        let snapshot = store
+            .load_snapshot()
+            .expect("snapshot should be readable")
+            .expect("snapshot should exist");
+        assert!(snapshot
+            .active_sparks
+            .iter()
+            .any(|stored| stored.id == spark.id));
+        let _ = std::fs::remove_dir_all(store_path);
+    }
+
     #[test]
     fn rejects_graphs_with_unknown_ports() {
         let runtime = test_runtime(default_graph());
@@ -1040,9 +1337,8 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(300)).await;
 
         let history = runtime.run_history().expect("history should load");
-        assert!(history
-            .iter()
-            .any(|entry| entry.spark_id == spark.id && entry.reason.as_deref() == Some("manual acceptance required")));
+        assert!(history.iter().any(|entry| entry.spark_id == spark.id
+            && entry.reason.as_deref() == Some("manual acceptance required")));
     }
 
     #[tokio::test]
@@ -1114,7 +1410,9 @@ mod tests {
             })
             .expect("spark should ignite");
         tokio::time::sleep(Duration::from_millis(300)).await;
-        let released = runtime.release_queue("queue").expect("queue should release");
+        let released = runtime
+            .release_queue("queue")
+            .expect("queue should release");
         tokio::time::sleep(Duration::from_millis(600)).await;
 
         let history = runtime.run_history().expect("history should load");

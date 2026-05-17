@@ -21,7 +21,7 @@ pub fn router(runtime: RuntimeHandle) -> Router {
         .route("/nodes", get(get_node_catalog))
         .route("/sparks", post(ignite_spark))
         .route("/sparks/extinguish", post(extinguish_sparks))
-        .route("/runtime/queues/:node_id/release", post(release_queue))
+        .route("/runtime/queues/{node_id}/release", post(release_queue))
         .route("/runtime/manual/resolve", post(resolve_manual_gate))
         .route("/runtime/history", get(get_run_history))
         .route("/runtime/diagnostics", get(get_diagnostics))
